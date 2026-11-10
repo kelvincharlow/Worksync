@@ -1,0 +1,18 @@
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+# Build output
+**/target/
+**/bin/
+**/obj/
+**/TestResults/
+# Editors and operating systems
+.idea/
+.vs/
+.vscode/
+*.iml
+.DS_Store
+*.log
