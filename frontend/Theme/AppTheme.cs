@@ -1,10 +1,11 @@
+
 using MudBlazor;
 
 namespace Worksync.Frontend.Theme;
 
 public static class AppTheme
 {
-    // Core palette — structural colors only
+    // Core palette
     public const string Navy = "#1B2A4A";
     public const string Indigo = "#3F51B5";
     public const string White = "#FFFFFF";
@@ -12,7 +13,7 @@ public static class AppTheme
     public const string MidGrey = "#E0E2E7";
     public const string TextDark = "#1A1A1A";
 
-    // Status colors — reserved, used ONLY for status/priority indicators
+    // Status colors
     public const string StatusGreen = "#2E7D32";
     public const string StatusRed = "#C62828";
     public const string StatusYellow = "#F9A825";
@@ -24,7 +25,7 @@ public static class AppTheme
         {
             Primary = Navy,
             Secondary = Indigo,
-            Background = White,
+            Background = LightGrey,
             Surface = White,
             AppbarBackground = Navy,
             DrawerBackground = White,
@@ -34,8 +35,7 @@ public static class AppTheme
             ActionDefault = Indigo,
             LinesDefault = MidGrey,
             TableLines = MidGrey,
-            Divider = MidGrey,
-            BackgroundGrey = LightGrey
+            Divider = MidGrey
         }
     };
 }
