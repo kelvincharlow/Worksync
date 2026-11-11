@@ -24,6 +24,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -259,6 +261,49 @@ class UserServiceTests {
         assertThat(result.getSort()).isEqualTo(request.getSort());
         assertThat(result.getContent()).containsExactly(UserResponse.from(user));
         verify(repository).findByStatus(AccountStatus.ACTIVE, request);
+    }
+
+    @ParameterizedTest
+    @EnumSource(AccountStatus.class)
+    void authenticationLookupReturnsStoredDetailsForAuthToEvaluate(AccountStatus status) {
+        User user = userInStatus(status);
+        ReflectionTestUtils.setField(user, "role", SystemRole.ADMIN);
+        when(repository.findByEmail("jane@example.com")).thenReturn(Optional.of(user));
+
+        var details = service.findForAuthentication("jane@example.com");
+
+        assertThat(details.id()).isEqualTo(user.getId());
+        assertThat(details.email()).isEqualTo("jane@example.com");
+        assertThat(details.passwordHash()).isEqualTo(HASH_FIXTURE);
+        assertThat(details.role()).isEqualTo(SystemRole.ADMIN);
+        assertThat(details.status()).isEqualTo(status);
+        verify(repository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void authenticationLookupNormalizesWhitespaceAndCase() {
+        User user = persistedUser();
+        when(repository.findByEmail("jane@example.com")).thenReturn(Optional.of(user));
+
+        var details = service.findForAuthentication("\t JANE@EXAMPLE.COM \n");
+
+        assertThat(details.id()).isEqualTo(user.getId());
+        verify(repository).findByEmail("jane@example.com");
+    }
+
+    @Test
+    void authenticationLookupThrowsForUnknownEmail() {
+        assertThatThrownBy(() -> service.findForAuthentication("missing@example.com"))
+                .isInstanceOf(UserNotFoundException.class).hasMessage("User not found");
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"   ", "not-an-email", "jane@"})
+    void authenticationLookupRejectsInvalidEmailBeforeRepositoryAccess(String email) {
+        assertThatThrownBy(() -> service.findForAuthentication(email))
+                .isInstanceOf(ConstraintViolationException.class);
+        verifyNoInteractions(repository);
     }
 
     private User userInStatus(AccountStatus status) {

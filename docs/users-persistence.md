@@ -1,4 +1,4 @@
-# Users persistence and service — steps 1–4
+# Users persistence and service — steps 1–4.5
 
 Implemented scope: User entity, AccountStatus/SystemRole enums, UserRepository, PostgreSQL migration V1, DTOs and UserService, including internal account-status operations and status-filtered listing. No controller, registration endpoint, authentication, administrator authorization, notifications, permissions or project membership is implemented. Other domains call UserService directly through Java, never UserRepository.
 
@@ -31,7 +31,7 @@ No migrations existed, so V1 is the first version. Flyway creates the schema; th
 - PostgreSQL's unique lower(email) index is the final uniqueness guarantee, including concurrent inserts and mixed-case direct SQL writes. existsByEmail is only a convenience pre-check and cannot prevent races. Direct SQL writers must trim email (enforced by a check) and should lowercase it too. No email provider-specific rewriting, such as removing dots or plus suffixes, is performed. Internationalized-email support needs an explicitly agreed Unicode/collation policy before expanding the contract beyond ordinary email addresses.
 - phoneNumber is a string matching E.164, including the leading plus; this layer rejects local formats rather than guessing a country. Names, email, phone and hash have persistence validation constraints. Auth remains responsible for request validation and raw-password policy.
 - passwordHash is private, has no public setter, and its trusted-backend getter is annotated JsonIgnore. Do not log it, include it in DTOs, or return User entities from HTTP endpoints. This annotation is defense in depth, not permission to serialize entities.
-- UserRepository belongs to Users. Auth can call UserService.createPendingUser with an already-encoded hash. getUserById and getUserByEmail return safe UserResponse records only; there is no credential lookup interface yet. Design any trusted authentication-details lookup separately in a later step.
+- UserRepository belongs to Users. Auth can call UserService.createPendingUser with an already-encoded hash. getUserById and getUserByEmail return safe UserResponse records only; findForAuthentication returns credential-bearing AuthUserDetails for trusted Auth Java calls only; never expose it from a controller.
 
 ## Differences from the draft OpenAPI
 
@@ -114,3 +114,11 @@ Tests added in this step:
 # Full suite after configuring a disposable TEST_DB_* PostgreSQL database:
 (cd backend && ./mvnw verify)
 ```
+
+## Trusted authentication lookup — step 4.5
+
+AuthService will call the injected UserService.findForAuthentication(email) directly in this application. The method is read-only, trims/lowercases and validates email using existing Users conventions, calls UserRepository.findByEmail, and throws UserNotFoundException for an unknown account. It returns AuthUserDetails with UUID, email, stored password hash, system role and current account status. It does not hash/verify passwords, permit/deny login or issue tokens. REJECTED/BLOCKED accounts can be looked up internally; Auth must evaluate their status before allowing authentication.
+
+AuthUserDetails is not an HTTP response DTO. Its passwordHash() accessor remains available to trusted Java code, its toString redacts all fields, and @JsonIgnore excludes the hash from Jackson JSON as defense in depth. Other account fields may still serialize: never return or nest this record in a public API response. Continue using UserResponse for safe account responses. Do not log the record's credential accessor, hashes or rejected validation values.
+
+Auth owns passwordEncoder.matches(rawPassword, details.passwordHash()), account-status restrictions and JWT generation. Auth should translate an unknown account or incorrect password into its agreed safe login failure; Users does not implement that flow. No Auth package, endpoint, security configuration or schema change is introduced by this step.
