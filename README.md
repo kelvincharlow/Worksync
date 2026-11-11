@@ -1,6 +1,6 @@
 # Worksync
 
-Eclectics project and issue management platform. This repository is a collaboration-ready project skeleton. Business-domain code and Worksync authentication flows will be implemented by the team in later changes.
+Eclectics project and issue management platform. This repository is a collaboration-ready project skeleton. Users steps 1–4 provide persistence, DTOs, basic profile operations and internal administrator status/listing operations; HTTP endpoints and Worksync authentication remain future work. See [Users persistence](docs/users-persistence.md).
 
 - `backend/`: Java 21, Spring Boot 4.1.2, Maven Wrapper, modular monolith.
 - `frontend/`: standalone Blazor WebAssembly, .NET 10 LTS, C# and HttpClient.
@@ -30,7 +30,7 @@ cd backend
 ./mvnw spring-boot:run
 ```
 
-Windows: use `mvnw.cmd` and set the variables from `.env` in your shell before running it. The default backend port is 8080. Startup connects to PostgreSQL and initializes Flyway; no business migrations exist yet. Spring Security uses its framework defaults, including CSRF protection and a generated development user/password printed at startup. This is not Worksync authentication or the initial System Administrator. No application API endpoints exist.
+Windows: use `mvnw.cmd` and set the variables from `.env` in your shell before running it. The default backend port is 8080. Startup connects to PostgreSQL and initializes Flyway; V1 creates the users table. Spring Security uses its framework defaults, including CSRF protection and a generated development user/password printed at startup. This is not Worksync authentication or the initial System Administrator. No application API endpoints exist.
 
 In a second terminal, from the root:
 
@@ -43,7 +43,7 @@ Open http://localhost:5000. `frontend/wwwroot/appsettings.json` supplies the pub
 
 ## Build and verification
 
-Backend integration tests require a **separate, disposable PostgreSQL database**. The single context smoke test exercises application startup with Flyway/JPA; feature and security tests belong with their future implementations. Do not point tests at a shared or production database. Example using the local PostgreSQL container:
+Backend integration tests require a **separate, disposable PostgreSQL database**. The context smoke test exercises startup; Users repository integration tests cover persistence, defaults, email uniqueness/lookups, pagination and timestamps. Users entity/service tests cover basic operations, validation, allowed/invalid status transitions, pagination and persisted timestamps. Internal administrator operations still require authorization during future secured-controller integration. Security tests belong with the future Auth implementation. Do not point tests at a shared or production database. Example using the local PostgreSQL container:
 
 ```sh
 docker compose exec postgres sh -c 'createdb -U "$POSTGRES_USER" worksync_test'
@@ -65,6 +65,6 @@ Stop infrastructure with `docker compose down`. The database volume persists. Ch
 
 Use short feature branches and reviewed pull requests into `main`. CI builds/tests the backend with PostgreSQL and builds/publishes the frontend. Each developer keeps an independent `.env` and local database. Review `docs/openapi.yaml` and agree contract changes before parallel implementation. See [development workflow](docs/development-workflow.md) and [architecture](docs/architecture.md).
 
-The supplied Module 1 draft is recorded in [OpenAPI](docs/openapi.yaml) and summarized in the [API contract](docs/api-contract.md). It proposes JWT login, required phone numbers, profile updates, registration approval/rejection and account blocking. JWT revocation/logout, permission grants and role changes are later-phase work. Next, the team should review the draft and split implementation tasks; no domain packages are pre-created. All milestone endpoints are [PLANNED](docs/api-contract.md). Future scope includes projects, work items, agile planning, workflows, reporting, collaboration, customization and selected integrations. MongoDB remains a future architecture decision.
+The supplied Module 1 draft is recorded in [OpenAPI](docs/openapi.yaml) and summarized in the [API contract](docs/api-contract.md). It proposes JWT login, required phone numbers, profile updates, registration approval/rejection and account blocking. JWT revocation/logout, permission grants and role changes are later-phase work. Next, the team should review the draft and split implementation tasks; the Users module currently includes entity, repository, dto, service and exception packages. All milestone endpoints are [PLANNED](docs/api-contract.md). Future scope includes projects, work items, agile planning, workflows, reporting, collaboration, customization and selected integrations. MongoDB remains a future architecture decision.
 
 Version references: [Spring Boot requirements](https://docs.spring.io/spring-boot/system-requirements.html), [.NET 10](https://dotnet.microsoft.com/en-us/download/dotnet/10.0).
