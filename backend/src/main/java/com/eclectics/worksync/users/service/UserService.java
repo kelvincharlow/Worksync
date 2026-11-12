@@ -93,6 +93,27 @@ public class UserService {
     }
 
     /**
+     * Trusted Auth-only persistence after Auth has validated the reset workflow and encoded the password.
+     * Does not verify reset codes, decide reset eligibility, hash passwords or invalidate tokens.
+     * Never log arguments or expose this method through an unauthenticated controller.
+     */
+    @Transactional
+    public void resetPassword(String email, String newPasswordHash) {
+        String normalized = normalizeEmail(email);
+        var emailViolations = validator.validateValue(CreateUserCommand.class, "email", normalized);
+        if (!emailViolations.isEmpty()) {
+            throw new ConstraintViolationException(emailViolations);
+        }
+        var hashViolations = validator.validateValue(User.class, "passwordHash", newPasswordHash);
+        if (!hashViolations.isEmpty()) {
+            throw new ConstraintViolationException(hashViolations);
+        }
+        User user = repository.findByEmail(normalized).orElseThrow(UserNotFoundException::new);
+        user.changePasswordHash(newPasswordHash);
+        repository.saveAndFlush(user);
+    }
+
+    /**
      * Replaces basic profile fields only. The caller must authorize access to userId.
      * Email, credentials, role and account status cannot be changed by this request.
      */
