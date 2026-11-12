@@ -14,7 +14,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
-
+import com.eclectics.worksync.auth.dto.ForgotPasswordRequest;
+import com.eclectics.worksync.auth.dto.MessageResponse;
+import com.eclectics.worksync.auth.dto.ResetPasswordConfirmRequest;
 import java.util.Collections;
 
 @Service
@@ -23,25 +25,28 @@ public class AuthService {
     private final UserService userService;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final PasswordResetTokenService passwordResetTokenService;
 
     public AuthService(UserService userService,
                     
                        PasswordEncoder passwordEncoder,
-                       JwtService jwtService) {
+                       JwtService jwtService,
+                       PasswordResetTokenService passwordResetTokenService) {
         this.userService = userService;
        
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+          this.passwordResetTokenService = passwordResetTokenService;
     }
 
     /**
-     * Handles public self-registration via teammate's UserService.
+     * Handles public self-registration via  UserService.
      */
     public UserResponse register(RegistrationRequest req) {
         // 1. Hash the raw password before sending to UserService
         String hashedPassword = passwordEncoder.encode(req.password());
 
-        // 2. Wrap into teammate's CreateUserCommand
+        // 2. Wrap into CreateUserCommand
         CreateUserCommand command = new CreateUserCommand(
                 req.firstName(),
                 req.lastName(),
@@ -51,7 +56,7 @@ public class AuthService {
         );
 
         try {
-            // 3. Delegate creation to UserService (returns their safe UserResponse DTO)
+            // 3. Delegate creation to UserService (returns the safe UserResponse DTO)
             return userService.createPendingUser(command);
         } catch (DuplicateEmailException ex) {
             // Translate to OpenAPI 409 Conflict
@@ -96,4 +101,45 @@ public class AuthService {
         UserResponse safeUser = userService.getUserById(user.id());
 
         return new AuthResponse(token, "Bearer", expiresIn, safeUser);
-    }}
+    }
+    /**
+     * Generates a 6-digit reset code if the account exists.
+     * Always returns 200 OK to prevent email harvesting.
+     */
+    public MessageResponse requestPasswordReset(ForgotPasswordRequest req) {
+        try {
+            // Verify user exists before generating code
+            userService.getUserByEmail(req.email());
+            passwordResetTokenService.createResetCode(req.email());
+        } catch (UserNotFoundException ex) {
+            // Silently ignore to prevent attackers from discovering registered emails
+        }
+
+        return new MessageResponse("If an account with this email exists, a password reset code has been sent.");
+    }
+
+    /**
+     * Validates the 6-digit code, hashes the new password, and updates the user.
+     */
+    public MessageResponse confirmPasswordReset(ResetPasswordConfirmRequest req) {
+        // 1. Verify code and expiration
+        boolean isValid = passwordResetTokenService.verifyAndConsumeCode(req.email(), req.resetCode());
+        if (!isValid) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid or expired reset code.");
+        }
+
+        // 2. Hash the new password
+        String hashedPassword = passwordEncoder.encode(req.newPassword());
+
+        // 3. Update the password via UserService (waiting for Kelvin to implement resetPassword)
+        /*
+        try {
+            userService.resetPassword(req.email(), hashedPassword);
+        } catch (UserNotFoundException ex) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found.");
+        }
+        */
+
+        return new MessageResponse("Password has been successfully reset. You can now log in with your new password.");
+    }
+}

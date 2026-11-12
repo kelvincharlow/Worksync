@@ -4,5 +4,5 @@ public record AuthResponse(
     String accessToken,
     String tokenType,
     int expiresIn,
-    UserResponse user //  connect this to UserDto 
+    UserResponse user //  connected to UserDto 
 ) {}
