@@ -37,22 +37,23 @@
 }
 
 /* Fields: forced override of Bootstrap defaults */
-.register-card .form-control {
+/* ::deep required — InputText renders the <input> outside this component's scope */
+.register-card ::deep .form-control {
+    background-color: #ffffff;
+    border: 1px solid #d7dce3 !important;
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
     width: 100%;
     min-height: 50px;
     padding: 14px 16px !important;
-    border: 1px solid #c9ddf2 !important;
     outline: none !important;
     border-radius: 8px !important;
     font-size: 0.95rem;
-    background-color: #eaf2fb !important;
     box-shadow: none !important;
 }
 
-.register-card .form-control:focus {
+.register-card ::deep .form-control:focus {
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
@@ -61,12 +62,13 @@
     background-color: #ffffff !important;
     box-shadow: 0 0 0 3px rgba(43, 58, 103, 0.12) !important;
 }
-.register-card .form-control::placeholder {
+
+.register-card ::deep .form-control::placeholder {
     color: #9aa7b5;
 }
 
 /* Button: full width + taller */
-.register-card .btn-primary {
+.register-card ::deep .btn-primary {
     display: block;
     width: 100%;
     padding: 14px 0 !important;
@@ -79,12 +81,20 @@
     transition: background-color 0.2s ease;
 }
 
-.register-card .btn-primary:hover:not(:disabled) {
+.register-card ::deep .btn-primary:hover:not(:disabled) {
     background-color: #161d3d !important;
 }
 
-.register-card .btn-primary:disabled {
+.register-card ::deep .btn-primary:disabled {
     opacity: 0.7;
+}
+
+/* ::deep required — ValidationMessage renders this span outside this component's scope */
+.register-card ::deep .validation-message {
+    color: #dc3545;
+    font-size: 0.8rem;
+    margin-top: 4px;
+    display: block;
 }
 
 .text-muted {
