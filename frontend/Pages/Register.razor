@@ -1,0 +1,121 @@
+@page "/"
+@page "/register"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@using System.Net.Http.Json
+
+
+<div class="register-container">
+    <div class="register-card">
+        <!-- Brand Logo and Header -->
+        <div class="text-center mb-4">
+                        <img src="/images/logo.png"
+                 alt="WorkSync Logo"
+                 class="brand-logo" />
+
+            <h2 class="mt-3 font-weight-bold">Create your account</h2>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+               {
+            <div class="alert alert-danger" role="alert">
+                @_errorMessage
+            </div>
+        }
+
+        <EditForm Model="@_registerModel" OnValidSubmit="HandleRegistration">
+            <DataAnnotationsValidator />
+
+            <div class="form-group mb-3">
+                <label>First name</label>
+                <InputText class="form-control" @bind-Value="_registerModel.FirstName" placeholder="First name" />
+                <ValidationMessage For="@(() => _registerModel.FirstName)" />
+            </div>
+
+            <div class="form-group mb-3">
+                <label>Last name</label>
+                <InputText class="form-control" @bind-Value="_registerModel.LastName" placeholder="Last name" />
+                <ValidationMessage For="@(() => _registerModel.LastName)" />
+            </div>
+
+            <div class="form-group mb-3">
+                <label>Email</label>
+                <InputText type="email" class="form-control" @bind-Value="_registerModel.Email" placeholder="jane.doe@example.com" />
+                <ValidationMessage For="@(() => _registerModel.Email)" />
+            </div>
+
+            <div class="form-group mb-3">
+                <label>Phone number</label>
+                <InputText class="form-control" @bind-Value="_registerModel.PhoneNumber" placeholder="+254712345678" />
+                <ValidationMessage For="@(() => _registerModel.PhoneNumber)" />
+            </div>
+
+            <div class="form-group mb-4">
+                <label>Password</label>
+                <InputText type="password" class="form-control" @bind-Value="_registerModel.Password" placeholder="••••••••" />
+                <ValidationMessage For="@(() => _registerModel.Password)" />
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block w-100 py-2" disabled="@_isLoading">
+                @if (_isLoading)
+                {
+                    <span class="spinner-border spinner-border-sm mr-2" role="status" aria-hidden="true"></span>
+                    <span>Creating account...</span>
+                }
+                else
+                {
+                    <span>Create account</span>
+                }
+            </button>
+        </EditForm>
+
+        <div class="text-center mt-3">
+            <p class="text-muted">Already have an account? <a href="/login">Sign in.</a></p>
+        </div>
+    </div>
+</div>
+
+@code {
+    private RegistrationRequestModel _registerModel = new();
+    private bool _isLoading = false;
+    private string? _errorMessage;
+
+    private async Task HandleRegistration()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            // Posts to http://localhost:8080/api/v1/auth/register (assuming BaseAddress is configured)
+            var response = await Http.PostAsJsonAsync("auth/register", _registerModel);
+
+            if (response.IsSuccessStatusCode)
+            {
+                // Account created with PENDING_APPROVAL status; navigate to login or pending notice
+                Navigation.NavigateTo("/login?registered=true");
+            }
+            else
+            {
+                // Handle API error responses (e.g., 409 Conflict if email exists, 400 Bad Request)
+                var errorContent = await response.Content.ReadFromJsonAsync<ApiErrorDto>();
+                _errorMessage = errorContent?.Message ?? "Registration failed. Please check your inputs.";
+            }
+        }
+        catch (Exception)
+        {
+            _errorMessage = "An unexpected error occurred. Please try again later.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    // Helper class matching the OpenAPI ApiError schema
+    private class ApiErrorDto
+    {
+        public string Code { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+    }
+}

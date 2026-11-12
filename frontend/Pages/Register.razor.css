@@ -1,0 +1,114 @@
+.register-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background-color: #f4f6f9;
+    padding: 20px;
+}
+
+.register-card {
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    padding: 40px 36px;
+    width: 100%;
+    max-width: 400px;
+}
+
+.brand-logo {
+    height: 40px;
+    margin-bottom: 8px;
+}
+
+.register-card h2 {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin-top: 0.5rem;
+}
+
+.form-group label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 6px;
+}
+
+/* Fields: forced override of Bootstrap defaults */
+.register-card .form-control {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    width: 100%;
+    min-height: 50px;
+    padding: 14px 16px !important;
+    border: 1px solid #c9ddf2 !important;
+    outline: none !important;
+    border-radius: 8px !important;
+    font-size: 0.95rem;
+    background-color: #eaf2fb !important;
+    box-shadow: none !important;
+}
+
+.register-card .form-control:focus {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    outline: none !important;
+    border: 1px solid #2b3a67 !important;
+    background-color: #ffffff !important;
+    box-shadow: 0 0 0 3px rgba(43, 58, 103, 0.12) !important;
+}
+.register-card .form-control::placeholder {
+    color: #9aa7b5;
+}
+
+/* Button: full width + taller */
+.register-card .btn-primary {
+    display: block;
+    width: 100%;
+    padding: 14px 0 !important;
+    background-color: #1f2a52 !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-weight: 600;
+    font-size: 1rem;
+    letter-spacing: 0.3px;
+    transition: background-color 0.2s ease;
+}
+
+.register-card .btn-primary:hover:not(:disabled) {
+    background-color: #161d3d !important;
+}
+
+.register-card .btn-primary:disabled {
+    opacity: 0.7;
+}
+
+.text-muted {
+    font-size: 0.9rem;
+    color: #6b7280 !important;
+}
+
+.text-muted a {
+    color: #1f2a52;
+    font-weight: 600;
+    text-decoration: none;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.text-muted a:hover {
+    background-color: #eaf2fb;
+    color: #1f2a52;
+    text-decoration: none;
+}
+
+.alert-danger {
+    border-radius: 8px;
+    font-size: 0.9rem;
+    padding: 10px 14px;
+}
