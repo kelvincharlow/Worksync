@@ -6,9 +6,9 @@ import com.eclectics.worksync.auth.dto.RegistrationRequest;
 import com.eclectics.worksync.users.dto.CreateUserCommand;
 import com.eclectics.worksync.users.dto.UserResponse;
 import com.eclectics.worksync.users.entity.AccountStatus;
-import com.eclectics.worksync.users.entity.User;
+import com.eclectics.worksync.users.dto.AuthUserDetails;
 import com.eclectics.worksync.users.exception.DuplicateEmailException;
-import com.eclectics.worksync.users.repository.UserRepository;
+import com.eclectics.worksync.users.exception.UserNotFoundException;
 import com.eclectics.worksync.users.service.UserService;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -21,16 +21,15 @@ import java.util.Collections;
 public class AuthService {
 
     private final UserService userService;
-    private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
     public AuthService(UserService userService,
-                       UserRepository userRepository,
+                    
                        PasswordEncoder passwordEncoder,
                        JwtService jwtService) {
         this.userService = userService;
-        this.userRepository = userRepository;
+       
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
     }
@@ -64,32 +63,37 @@ public class AuthService {
      * Authenticates with email and password, returning a JWT for ACTIVE or PENDING_APPROVAL users.
      */
     public AuthResponse login(LoginRequest req) {
-        // 1. Look up user by email (OpenAPI: 401 if missing)
-        User user = userRepository.findByEmail(req.email())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Incorrect email or password."));
-
-        // 2. Verify password (OpenAPI: 401 if mismatch)
-        if (!passwordEncoder.matches(req.password(), user.getPasswordHash())) {
+        // 1. Fetch credentials via UserService (returns 401 if user not found)
+        AuthUserDetails user;
+        try {
+            user = userService.findForAuthentication(req.email());
+        } catch (UserNotFoundException ex) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Incorrect email or password.");
         }
 
-        // 3. Enforce OpenAPI status rule: BLOCKED or REJECTED accounts are denied access (403 Forbidden)
-        if (user.getStatus() == AccountStatus.BLOCKED || user.getStatus() == AccountStatus.REJECTED) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account is " + user.getStatus() + ".");
+        // 2. Verify password
+        if (!passwordEncoder.matches(req.password(), user.passwordHash())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Incorrect email or password.");
         }
 
-        // 4. Generate JWT access token with user claims
+        // 3. Reject BLOCKED and REJECTED accounts
+        if (user.status() == AccountStatus.BLOCKED || user.status() == AccountStatus.REJECTED) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account is " + user.status() + ".");
+        }
+
+        // 4. Generate JWT
         String token = jwtService.generateToken(
-                user.getId().toString(),
-                user.getEmail(),
-                user.getRole().name(),
-                user.getStatus().name(),
+                user.id().toString(),
+                user.email(),
+                user.role().name(),
+                user.status().name(),
                 Collections.emptySet()
         );
 
         int expiresIn = jwtService.getExpirationSeconds();
 
-        // 5. Return AuthResponse containing token and safe UserResponse
-        return new AuthResponse(token, "Bearer", expiresIn, UserResponse.from(user));
-    }
-}
+        // 5. Fetch safe UserResponse for login response
+        UserResponse safeUser = userService.getUserById(user.id());
+
+        return new AuthResponse(token, "Bearer", expiresIn, safeUser);
+    }}

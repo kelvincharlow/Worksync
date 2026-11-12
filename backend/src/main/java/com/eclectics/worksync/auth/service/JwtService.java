@@ -21,15 +21,18 @@ public class JwtService {
     private final String issuer;
 
     public JwtService(
-            // Needs a 256-bit secret key for HMAC-SHA256
-            @Value("${app.jwt.secret:default-secret-key-that-must-be-at-least-256-bits-long-worksync}") String secret,
-            @Value("${app.jwt.expiration-seconds:900}") int expirationSeconds, // 900s = 15 minutes
+            @Value("${app.jwt.secret}") String secret,
+            @Value("${app.jwt.expiration-seconds:900}") int expirationSeconds,
             @Value("${app.jwt.issuer:worksync-api}") String issuer) {
+
+        if (secret == null || secret.getBytes(StandardCharsets.UTF_8).length < 32) {
+            throw new IllegalStateException("JWT secret must be configured and at least 256 bits (32 bytes) long.");
+        }
+
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.expirationSeconds = expirationSeconds;
         this.issuer = issuer;
     }
-
     /**
      * Generates a signed JWT access token with user details as claims.
      */
@@ -55,20 +58,25 @@ public class JwtService {
      */
     public boolean validateToken(String token) {
         try {
-            Jwts.parser().verifyWith(key).build().parseSignedClaims(token);
+            Jwts.parser()
+                    .verifyWith(key)
+                    .requireIssuer(issuer)
+                    .build()
+                    .parseSignedClaims(token);
             return true;
         } catch (JwtException | IllegalArgumentException e) {
             return false;
         }
     }
 
-    /**
-     * Extracts all data (claims) packed inside the token.
-     */
     public Claims extractAllClaims(String token) {
-        return Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
+        return Jwts.parser()
+                .verifyWith(key)
+                .requireIssuer(issuer)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
     }
-
     /**
      * Extracts the user ID (subject) from the token.
      */

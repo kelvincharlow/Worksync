@@ -10,6 +10,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
@@ -21,22 +23,33 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            // 1. Disable CSRF (Cross-Site Request Forgery) because we are using stateless JWTs, not cookies
             .csrf(csrf -> csrf.disable())
-
-            // 2. We don't want server-side HTTP sessions; each request must carry its own token
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-
-            // 3. Define route permissions
             .authorizeHttpRequests(auth -> auth
-                // Allow public access to registration, login, and Swagger documentation
+                // 1. Public endpoints
                 .requestMatchers("/api/v1/auth/**").permitAll()
                 .requestMatchers("/error").permitAll()
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                // Any other endpoint requires authentication
-                .anyRequest().authenticated()
-            );
+
+                // 2. Admin routes require ACTIVE ADMIN
+                .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+
+                // 3. Allowed routes for PENDING_APPROVAL and ACTIVE users
+                .requestMatchers("/api/v1/users/me", "/api/v1/notifications/**").authenticated()
+
+                // 4. All other endpoints require an ACTIVE account
+                .anyRequest().hasAuthority("STATUS_ACTIVE")
+            )
+            // 5. REST 401 and 403 handling
+            .exceptionHandling(ex -> ex
+                .authenticationEntryPoint((request, response, authException) ->
+                        response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized"))
+                .accessDeniedHandler((request, response, accessDeniedException) ->
+                        response.sendError(HttpServletResponse.SC_FORBIDDEN, "Forbidden"))
+            )
+            // 6. Execute JwtFilter before UsernamePasswordAuthenticationFilter
+            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
@@ -45,5 +58,14 @@ public class SecurityConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
+    }
+
+    // Prevents Spring Boot from auto-registering JwtFilter as a generic servlet filter,
+    // ensuring it runs ONLY inside the Spring Security filter chain.
+    @Bean
+    public FilterRegistrationBean<JwtFilter> jwtFilterRegistration(JwtFilter filter) {
+        FilterRegistrationBean<JwtFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
     }
 }
