@@ -1,10 +1,10 @@
 # Architecture
 
-## Current skeleton
+## Current implementation
 
 One repository contains a Spring Boot application (`backend/`), a standalone Blazor WebAssembly application (`frontend/`) and team documentation (`docs/`). Java 21, Maven Wrapper, .NET 10, PostgreSQL, JPA and Flyway are configured. The frontend has a static starting page and an injected HttpClient.
 
-There are no business-domain packages, controllers, services, repositories, entities, DTOs, domain tables or JWT implementation. Spring Security uses its default protection with CSRF enabled. Its generated development login is framework behavior, not the planned Worksync login or initial System Administrator. No custom CORS policy exists yet. There are no business migrations; add the first versioned migration when persistence work begins. Hibernate validates schemas rather than creating or updating them.
+Users steps 1–4 add the User entity, account/role enums, UserRepository, DTOs, a basic UserService and the users table through Flyway V1. See [Users persistence](users-persistence.md) for mappings and the Auth integration contract. UserService supports pending-account creation, safe ID/email lookup, basic profile updates, controlled internal account-status operations and paginated status filtering. These administration operations are not automatically secured: the future AdminUserController and trusted callers must enforce administrator authorization before using them. There are no controllers, HTTP endpoints or JWT implementation. Spring Security uses its default protection with CSRF enabled. Its generated development login is framework behavior, not the planned Worksync login or initial System Administrator. No custom CORS policy exists yet. V1 creates the users table; add new versioned migrations for subsequent schema changes. Hibernate validates schemas rather than creating or updating them.
 
 ## Planned modular monolith
 
