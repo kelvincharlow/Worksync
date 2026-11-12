@@ -6,6 +6,8 @@ One repository contains a Spring Boot application (`backend/`), a standalone Bla
 
 Users steps 1–4 add the User entity, account/role enums, UserRepository, DTOs, a basic UserService and the users table through Flyway V1. See [Users persistence](users-persistence.md) for mappings and the Auth integration contract. UserService supports pending-account creation, safe ID/email lookup, basic profile updates, controlled internal account-status operations and paginated status filtering. These administration operations are not automatically secured: the future AdminUserController and trusted callers must enforce administrator authorization before using them. There are no controllers, HTTP endpoints or JWT implementation. Spring Security uses its default protection with CSRF enabled. Its generated development login is framework behavior, not the planned Worksync login or initial System Administrator. No custom CORS policy exists yet. V1 creates the users table; add new versioned migrations for subsequent schema changes. Hibernate validates schemas rather than creating or updating them.
 
+Notifications now has a profile-gated internal SMTP adapter for password-reset codes and password-change confirmations. Auth workflow integration is pending; no mail is sent by default. See [email delivery](email-delivery.md). In-app notification persistence remains a separate, unimplemented design.
+
 ## Planned modular monolith
 
 Build one backend deployable, organized by business domain when the team implements each feature:
