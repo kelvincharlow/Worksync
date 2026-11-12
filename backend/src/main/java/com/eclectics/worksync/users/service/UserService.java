@@ -1,5 +1,6 @@
 package com.eclectics.worksync.users.service;
 
+import com.eclectics.worksync.users.dto.AuthUserDetails;
 import com.eclectics.worksync.users.dto.CreateUserCommand;
 import com.eclectics.worksync.users.dto.UpdateProfileRequest;
 import com.eclectics.worksync.users.dto.UserResponse;
@@ -21,7 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Shared Java boundary for Users operations inside the monolith.
  * Auth and future controllers inject this Spring bean rather than accessing UserRepository.
- * All results are safe DTOs. Callers must enforce current-user/admin authorization;
+ * UserResponse contains safe account data; AuthUserDetails is credential-bearing and internal only.
+ * Callers must enforce current-user/admin authorization;
  * the status-changing methods below do not authenticate or authorize their caller.
  */
 @Service
@@ -72,6 +74,22 @@ public class UserService {
         return repository.findByEmail(normalized)
                 .map(UserResponse::from)
                 .orElseThrow(UserNotFoundException::new);
+    }
+
+    /**
+     * Trusted Auth-only Java lookup; never expose this result through an HTTP endpoint.
+     * Returns the stored hash and current state without verifying passwords or deciding access.
+     */
+    @Transactional(readOnly = true)
+    public AuthUserDetails findForAuthentication(String email) {
+        String normalized = normalizeEmail(email);
+        var violations = validator.validateValue(CreateUserCommand.class, "email", normalized);
+        if (!violations.isEmpty()) {
+            throw new ConstraintViolationException(violations);
+        }
+        User user = repository.findByEmail(normalized).orElseThrow(UserNotFoundException::new);
+        return new AuthUserDetails(user.getId(), user.getEmail(), user.getPasswordHash(),
+                user.getRole(), user.getStatus());
     }
 
     /**
