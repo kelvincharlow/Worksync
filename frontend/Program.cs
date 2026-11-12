@@ -1,3 +1,4 @@
+using Worksync.Frontend.Services;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using MudBlazor.Services;
@@ -19,5 +20,11 @@ if (!Uri.TryCreate(apiBaseUrl, UriKind.Absolute, out var apiUri)
 builder.Services.AddScoped(_ => new HttpClient { BaseAddress = apiUri });
 
 builder.Services.AddMudServices();
+
+builder.Services.AddScoped<AuthState>();
+
+Console.WriteLine(
+    $"AuthState registered: {builder.Services.Any(x => x.ServiceType == typeof(AuthState))}"
+);
 
 await builder.Build().RunAsync();

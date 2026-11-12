@@ -23,37 +23,37 @@
             </div>
         }
 
-        <EditForm Model="@_registerModel" OnValidSubmit="HandleRegistration">
+        <EditForm Model="@_register" OnValidSubmit="HandleRegistration">
             <DataAnnotationsValidator />
 
             <div class="form-group mb-3">
                 <label>First name</label>
-                <InputText class="form-control" @bind-Value="_registerModel.FirstName" placeholder="First name" />
-                <ValidationMessage For="@(() => _registerModel.FirstName)" />
+                <InputText class="form-control" @bind-Value="_register.FirstName" placeholder="First name" />
+                <ValidationMessage For="@(() => _register.FirstName)" />
             </div>
 
             <div class="form-group mb-3">
                 <label>Last name</label>
-                <InputText class="form-control" @bind-Value="_registerModel.LastName" placeholder="Last name" />
-                <ValidationMessage For="@(() => _registerModel.LastName)" />
+                <InputText class="form-control" @bind-Value="_register.LastName" placeholder="Last name" />
+                <ValidationMessage For="@(() => _register.LastName)" />
             </div>
 
             <div class="form-group mb-3">
                 <label>Email</label>
-                <InputText type="email" class="form-control" @bind-Value="_registerModel.Email" placeholder="jane.doe@example.com" />
-                <ValidationMessage For="@(() => _registerModel.Email)" />
+                <InputText type="email" class="form-control" @bind-Value="_register.Email" placeholder="jane.doe@example.com" />
+                <ValidationMessage For="@(() => _register.Email)" />
             </div>
 
             <div class="form-group mb-3">
                 <label>Phone number</label>
-                <InputText class="form-control" @bind-Value="_registerModel.PhoneNumber" placeholder="+254712345678" />
-                <ValidationMessage For="@(() => _registerModel.PhoneNumber)" />
+                <InputText class="form-control" @bind-Value="_register.PhoneNumber" placeholder="+254712345678" />
+                <ValidationMessage For="@(() => _register.PhoneNumber)" />
             </div>
 
             <div class="form-group mb-4">
                 <label>Password</label>
-                <InputText type="password" class="form-control" @bind-Value="_registerModel.Password" placeholder="••••••••" />
-                <ValidationMessage For="@(() => _registerModel.Password)" />
+                <InputText type="password" class="form-control" @bind-Value="_register.Password" placeholder="••••••••" />
+                <ValidationMessage For="@(() => _register.Password)" />
             </div>
 
             <button type="submit" class="btn btn-primary btn-block w-100 py-2" disabled="@_isLoading">
@@ -76,7 +76,7 @@
 </div>
 
 @code {
-    private RegistrationRequestModel _registerModel = new();
+    private RegistrationRequest _register = new();
     private bool _isLoading = false;
     private string? _errorMessage;
 
@@ -88,7 +88,7 @@
         try
         {
             // Posts to http://localhost:8080/api/v1/auth/register (assuming BaseAddress is configured)
-            var response = await Http.PostAsJsonAsync("auth/register", _registerModel);
+            var response = await Http.PostAsJsonAsync("auth/register", _register    );
 
             if (response.IsSuccessStatusCode)
             {

@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-public class RegistrationRequestModel
+public class RegistrationRequest
 {
     [Required(ErrorMessage = "First name is required.")]
     [StringLength(80, MinimumLength = 1, ErrorMessage = "First name must be between 1 and 80 characters.")]
