@@ -131,7 +131,7 @@ public class AuthService {
         // 2. Hash the new password
         String hashedPassword = passwordEncoder.encode(req.newPassword());
 
-        // 3. Update the password via UserService (waiting for Kelvin to implement resetPassword)
+        // 3. Update the password via UserService 
         /*
         try {
             userService.resetPassword(req.email(), hashedPassword);
