@@ -1,4 +1,4 @@
-package com.eclectics.worksync.auth;
+package com.eclectics.worksync.auth.security;
 
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
@@ -11,6 +11,8 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+
+import com.eclectics.worksync.auth.service.JwtService;
 
 import java.io.IOException;
 import java.util.ArrayList;

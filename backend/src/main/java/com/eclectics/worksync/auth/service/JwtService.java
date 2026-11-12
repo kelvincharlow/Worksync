@@ -1,4 +1,4 @@
-package com.eclectics.worksync.auth;
+package com.eclectics.worksync.auth.service;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;

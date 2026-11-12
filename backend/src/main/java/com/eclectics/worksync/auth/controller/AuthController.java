@@ -1,9 +1,14 @@
-package com.eclectics.worksync.auth;
+package com.eclectics.worksync.auth.controller;
 
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import com.eclectics.worksync.auth.dto.AuthResponse;
+import com.eclectics.worksync.auth.dto.LoginRequest;
+import com.eclectics.worksync.auth.dto.RegistrationRequest;
+import com.eclectics.worksync.auth.service.AuthService;
 
 @RestController
 @RequestMapping("/api/v1/auth")

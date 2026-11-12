@@ -1,5 +1,8 @@
-package com.eclectics.worksync.auth;
+package com.eclectics.worksync.auth.service;
 
+import com.eclectics.worksync.auth.dto.AuthResponse;
+import com.eclectics.worksync.auth.dto.LoginRequest;
+import com.eclectics.worksync.auth.dto.RegistrationRequest;
 import com.eclectics.worksync.users.dto.CreateUserCommand;
 import com.eclectics.worksync.users.dto.UserResponse;
 import com.eclectics.worksync.users.entity.AccountStatus;

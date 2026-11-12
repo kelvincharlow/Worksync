@@ -1,4 +1,4 @@
-package com.eclectics.worksync.auth;
+package com.eclectics.worksync.auth.dto;
 
 public record AuthResponse(
     String accessToken,

@@ -1,4 +1,4 @@
-package com.eclectics.worksync.auth;
+package com.eclectics.worksync.auth.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
