@@ -98,7 +98,7 @@
             else
             {
                 // Handle API error responses (e.g., 409 Conflict if email exists, 400 Bad Request)
-                var errorContent = await response.Content.ReadFromJsonAsync<ApiErrorDto>();
+                var errorContent = await response.Content.ReadFromJsonAsync<ApiError>();
                 _errorMessage = errorContent?.Message ?? "Registration failed. Please check your inputs.";
             }
         }
@@ -112,10 +112,4 @@
         }
     }
 
-    // Helper class matching the OpenAPI ApiError schema
-    private class ApiErrorDto
-    {
-        public string Code { get; set; } = string.Empty;
-        public string Message { get; set; } = string.Empty;
     }
-}
