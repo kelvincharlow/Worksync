@@ -34,25 +34,25 @@
             </div>
         }
 
-        <EditForm Model="@_loginModel" OnValidSubmit="HandleLogin">
+        <EditForm Model="@_login" OnValidSubmit="HandleLogin">
             <DataAnnotationsValidator />
 
             <div class="form-group mb-3">
                 <label>Email</label>
                 <InputText type="email" class="form-control"
-                           @bind-Value="_loginModel.Email"
+                           @bind-Value="_login.Email"
                            placeholder="jane.doe@example.com"
                            autocomplete="username" />
-                <ValidationMessage For="@(() => _loginModel.Email)" />
+                <ValidationMessage For="@(() => _login.Email)" />
             </div>
 
             <div class="form-group mb-4">
                 <label>Password</label>
                 <InputText type="password" class="form-control"
-                           @bind-Value="_loginModel.Password"
+                           @bind-Value="_login.Password"
                            placeholder="••••••••"
                            autocomplete="current-password" />
-                <ValidationMessage For="@(() => _loginModel.Password)" />
+                <ValidationMessage For="@(() => _login.Password)" />
             </div>
 
             <button type="submit" class="btn btn-primary btn-block w-100 py-2" disabled="@_isLoading">
@@ -67,6 +67,9 @@
                 }
             </button>
         </EditForm>
+        <div class="text-center mt-3">
+            <a href="/forgot-password" class="auth-link-muted">Forgot your password?</a>
+        </div>
 
         <div class="text-center mt-3">
             <p class="text-muted">Don't have an account? <a href="/register">Create one.</a></p>
@@ -79,21 +82,27 @@
     public bool? Registered { get; set; }
 
     [SupplyParameterFromQuery(Name = "returnUrl")]
+    
     public string? ReturnUrl { get; set; }
+    [SupplyParameterFromQuery(Name = "passwordReset")]   
+    public bool? PasswordReset { get; set; } 
 
-    private LoginRequest _loginModel = new();
+    private LoginRequest _login = new();
     private bool _isLoading;
     private string? _errorMessage;
     private string? _successMessage;
 
-    protected override void OnInitialized()
+        protected override void OnInitialized()
     {
         if (Registered == true)
         {
             _successMessage = "Account created. An administrator must approve it before you can access the workspace.";
         }
+        if (PasswordReset == true)
+        {
+            _successMessage = "Password has been successfully reset. You can now log in with your new password.";
+        }
     }
-
     private async Task HandleLogin()
     {
         _isLoading = true;
@@ -101,7 +110,7 @@
 
         try
         {
-            var response = await Http.PostAsJsonAsync("auth/login", _loginModel);
+            var response = await Http.PostAsJsonAsync("auth/login", _login);
 
             if (response.IsSuccessStatusCode)
             {
