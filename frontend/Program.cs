@@ -23,8 +23,6 @@ builder.Services.AddMudServices();
 
 builder.Services.AddScoped<AuthState>();
 
-Console.WriteLine(
-    $"AuthState registered: {builder.Services.Any(x => x.ServiceType == typeof(AuthState))}"
-);
+builder.Services.AddScoped<AuthApiService>();
 
 await builder.Build().RunAsync();

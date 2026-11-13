@@ -1,6 +1,8 @@
 @page "/"
 @page "/register"
-@inject HttpClient Http
+@layout AuthLayout
+@using Worksync.Frontend.Models.Auth 
+@inject AuthApiService AuthApi   
 @inject NavigationManager Navigation
 @using System.Net.Http.Json
 
@@ -81,35 +83,20 @@
     private string? _errorMessage;
 
     private async Task HandleRegistration()
+{
+    _isLoading = true;
+    _errorMessage = null;
+
+    var result = await AuthApi.RegisterAsync(_register);
+
+    if (result.IsSuccess)
     {
-        _isLoading = true;
-        _errorMessage = null;
-
-        try
-        {
-            // Posts to http://localhost:8080/api/v1/auth/register (assuming BaseAddress is configured)
-            var response = await Http.PostAsJsonAsync("auth/register", _register    );
-
-            if (response.IsSuccessStatusCode)
-            {
-                // Account created with PENDING_APPROVAL status; navigate to login or pending notice
-                Navigation.NavigateTo("/login?registered=true");
-            }
-            else
-            {
-                // Handle API error responses (e.g., 409 Conflict if email exists, 400 Bad Request)
-                var errorContent = await response.Content.ReadFromJsonAsync<ApiError>();
-                _errorMessage = errorContent?.Message ?? "Registration failed. Please check your inputs.";
-            }
-        }
-        catch (Exception)
-        {
-            _errorMessage = "An unexpected error occurred. Please try again later.";
-        }
-        finally
-        {
-            _isLoading = false;
-        }
+        Navigation.NavigateTo("/login?registered=true");
+        return;
     }
+
+    _errorMessage = result.ErrorMessage ?? "Registration failed. Please check your inputs.";
+    _isLoading = false;
+}
 
     }
