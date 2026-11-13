@@ -9,7 +9,10 @@ import com.eclectics.worksync.auth.dto.AuthResponse;
 import com.eclectics.worksync.auth.dto.LoginRequest;
 import com.eclectics.worksync.auth.dto.RegistrationRequest;
 import com.eclectics.worksync.auth.service.AuthService;
-
+import com.eclectics.worksync.auth.dto.ForgotPasswordRequest;
+import com.eclectics.worksync.auth.dto.MessageResponse;
+import com.eclectics.worksync.auth.dto.ResetPasswordConfirmRequest;
+import com.eclectics.worksync.users.dto.UserResponse;
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
@@ -24,9 +27,9 @@ public class AuthController {
      * Public self-registration endpoint.
      * Path: POST /api/v1/auth/register
      */
-    @PostMapping("/register")
-    public ResponseEntity<?> register(@Valid @RequestBody RegistrationRequest request) {
-        Object registeredUser = authService.register(request);
+  @PostMapping("/register")
+    public ResponseEntity<UserResponse> register(@Valid @RequestBody RegistrationRequest request) {
+        UserResponse registeredUser = authService.register(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(registeredUser);
     }
 
@@ -37,6 +40,17 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         AuthResponse response = authService.login(request);
+        return ResponseEntity.ok(response);
+    }
+    @PostMapping("/forgot-password")
+    public ResponseEntity<MessageResponse> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        MessageResponse response = authService.requestPasswordReset(request);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<MessageResponse> resetPassword(@Valid @RequestBody ResetPasswordConfirmRequest request) {
+        MessageResponse response = authService.confirmPasswordReset(request);
         return ResponseEntity.ok(response);
     }
 }

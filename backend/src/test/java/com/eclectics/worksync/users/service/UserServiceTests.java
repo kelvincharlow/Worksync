@@ -306,6 +306,57 @@ class UserServiceTests {
         verifyNoInteractions(repository);
     }
 
+    @ParameterizedTest
+    @EnumSource(AccountStatus.class)
+    void resetsOnlyHashAndLeavesEligibilityDecisionsToAuth(AccountStatus status) {
+        User user = userInStatus(status);
+        ReflectionTestUtils.setField(user, "role", SystemRole.ADMIN);
+        UserResponse originalProfile = UserResponse.from(user);
+        String newHash = "new-encoded-hash-fixture";
+        when(repository.findByEmail("jane@example.com")).thenReturn(Optional.of(user));
+        when(repository.saveAndFlush(user)).thenReturn(user);
+
+        service.resetPassword("\t JANE@EXAMPLE.COM \n", newHash);
+
+        assertThat(user.getPasswordHash()).isEqualTo(newHash);
+        // Mocked persistence does not run JPA timestamp callbacks; all profile fields are unchanged.
+        assertThat(UserResponse.from(user)).isEqualTo(originalProfile);
+        assertThat(service.findForAuthentication("jane@example.com").passwordHash()).isEqualTo(newHash);
+        verify(repository).saveAndFlush(user);
+    }
+
+    @Test
+    void passwordResetThrowsForMissingUser() {
+        assertThatThrownBy(() -> service.resetPassword("missing@example.com", "new-encoded-hash-fixture"))
+                .isInstanceOf(UserNotFoundException.class);
+        verify(repository, never()).saveAndFlush(any());
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {" ", "\t\n"})
+    void passwordResetRejectsInvalidHashBeforeRepositoryAccess(String hash) {
+        assertThatThrownBy(() -> service.resetPassword("jane@example.com", hash))
+                .isInstanceOf(ConstraintViolationException.class);
+        verifyNoInteractions(repository);
+    }
+
+    @Test
+    void passwordResetEnforcesHashStorageLimit() {
+        assertThatThrownBy(() -> service.resetPassword("jane@example.com", "x".repeat(513)))
+                .isInstanceOf(ConstraintViolationException.class);
+        verifyNoInteractions(repository);
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {" ", "not-an-email"})
+    void passwordResetRejectsInvalidEmailBeforeRepositoryAccess(String email) {
+        assertThatThrownBy(() -> service.resetPassword(email, "new-encoded-hash-fixture"))
+                .isInstanceOf(ConstraintViolationException.class);
+        verifyNoInteractions(repository);
+    }
+
     private User userInStatus(AccountStatus status) {
         User user = persistedUser();
         switch (status) {

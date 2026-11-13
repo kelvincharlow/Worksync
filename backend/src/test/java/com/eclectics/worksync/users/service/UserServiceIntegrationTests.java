@@ -134,6 +134,37 @@ class UserServiceIntegrationTests {
         assertThat(next.getContent()).extracting(UserResponse::email).containsExactly("b@example.com");
     }
 
+    @Test
+    void passwordResetPersistsNewHashForAuthWithoutChangingOtherAccountFields() {
+        var created = service.createPendingUser(command());
+        service.approveUser(created.id());
+        service.blockUser(created.id());
+        jdbc.update("""
+                UPDATE users SET role = 'ADMIN', updated_at = created_at - INTERVAL '1 day'
+                WHERE id = ?
+                """, created.id());
+        entityManager.clear();
+        var before = jdbc.queryForMap("SELECT * FROM users WHERE id = ?", created.id());
+        var oldUpdatedAt = repository.findById(created.id()).orElseThrow().getUpdatedAt();
+        String newHash = "new-encoded-hash-fixture";
+
+        service.resetPassword(" SERVICE@EXAMPLE.COM ", newHash);
+        entityManager.clear();
+
+        var details = service.findForAuthentication("service@example.com");
+        var profile = service.getUserById(created.id());
+        var after = jdbc.queryForMap("SELECT * FROM users WHERE id = ?", created.id());
+        assertThat(details.passwordHash()).isEqualTo(newHash);
+        assertThat(after.get("password_hash")).isEqualTo(newHash);
+        assertThat(details.role()).isEqualTo(SystemRole.ADMIN);
+        assertThat(details.status()).isEqualTo(AccountStatus.BLOCKED);
+        assertThat(profile.updatedAt()).isAfter(oldUpdatedAt);
+        for (String column : new String[]{"id", "first_name", "last_name", "email", "phone_number",
+                "role", "status", "created_at"}) {
+            assertThat(after.get(column)).as(column).isEqualTo(before.get(column));
+        }
+    }
+
     private UserResponse changeStatus(String operation, UUID id) {
         return switch (operation) {
             case "approve" -> service.approveUser(id);

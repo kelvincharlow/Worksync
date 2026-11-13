@@ -12,6 +12,9 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
+import org.springframework.security.authorization.AuthorizationManagers;
+import org.springframework.security.authorization.AuthorityAuthorizationManager;
+
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
@@ -32,8 +35,13 @@ public class SecurityConfig {
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                // 2. Admin routes require ACTIVE ADMIN
-                .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+                /// 2. Admin routes require BOTH ROLE_ADMIN and STATUS_ACTIVE
+                .requestMatchers("/api/v1/admin/**").access(
+                 AuthorizationManagers.allOf(
+                 AuthorityAuthorizationManager.hasRole("ADMIN"),
+                 AuthorityAuthorizationManager.hasAuthority("STATUS_ACTIVE")
+    )
+)
 
                 // 3. Allowed routes for PENDING_APPROVAL and ACTIVE users
                 .requestMatchers("/api/v1/users/me", "/api/v1/notifications/**").authenticated()

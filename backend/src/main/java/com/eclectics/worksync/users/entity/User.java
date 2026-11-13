@@ -103,6 +103,14 @@ public class User {
         updatedAt = Instant.now();
     }
 
+    /** Replaces only the stored hash; trusted Auth code must supply an already-encoded value. */
+    public void changePasswordHash(String newPasswordHash) {
+        if (newPasswordHash == null || newPasswordHash.isBlank() || newPasswordHash.length() > 512) {
+            throw new IllegalArgumentException("Password hash must be nonblank and at most 512 characters");
+        }
+        passwordHash = newPasswordHash;
+    }
+
     /** PENDING_APPROVAL -> ACTIVE. Authorization belongs to the calling workflow. */
     public void approve() {
         transitionStatus(AccountStatus.PENDING_APPROVAL, AccountStatus.ACTIVE);
