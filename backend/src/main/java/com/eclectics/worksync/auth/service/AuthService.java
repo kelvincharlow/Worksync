@@ -24,22 +24,24 @@ import com.eclectics.worksync.notifications.email.EmailNotificationService;
 @Service
 public class AuthService {
 
-   private final UserService userService;
+   private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AuthService.class);
+
+    private final UserService userService;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final PasswordResetTokenService passwordResetTokenService;
-
-    @Autowired(required = false)
-    private EmailNotificationService emailNotificationService;
+    private final EmailNotificationService emailNotificationService;
 
     public AuthService(UserService userService,
                        PasswordEncoder passwordEncoder,
                        JwtService jwtService,
-                       PasswordResetTokenService passwordResetTokenService) {
+                       PasswordResetTokenService passwordResetTokenService,
+                       EmailNotificationService emailNotificationService) {
         this.userService = userService;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.passwordResetTokenService = passwordResetTokenService;
+        this.emailNotificationService = emailNotificationService;
     }
 
     /**
@@ -105,35 +107,32 @@ public class AuthService {
 
         return new AuthResponse(token, "Bearer", expiresIn, safeUser);
     }
-    /**
-     * Generates a 6-digit reset code if the account exists.
-     * Always returns 200 OK to prevent email harvesting.
+   /**
+     * Generates a 6-digit reset code if eligible and dispatches email.
+     * Always returns the same generic message to prevent account enumeration.
      */
-   public MessageResponse requestPasswordReset(ForgotPasswordRequest req) {
+    public MessageResponse requestPasswordReset(ForgotPasswordRequest req) {
         try {
-            // 1. Verify user exists before generating code
-            userService.getUserByEmail(req.email());
-
-            // 2. Generate the code
-            String rawCode = passwordResetTokenService.createResetCode(req.email());
-
-            // 3. Send the code via email (if EmailNotificationService is available)
-            if (emailNotificationService != null) {
+            // 1. Verify user exists and is active/eligible
+            UserResponse user = userService.getUserByEmail(req.email());
+            
+            if (user.status() == AccountStatus.ACTIVE) {
+                // 2. Generate code and dispatch email
+                String rawCode = passwordResetTokenService.createResetCode(req.email());
                 emailNotificationService.sendPasswordResetCode(req.email(), rawCode, 15);
             }
-
         } catch (UserNotFoundException ex) {
-            // Silently ignore to prevent attackers from discovering registered emails
+            // Silently ignore to prevent account enumeration
+        } catch (Exception ex) {
+            // Log delivery failure internally without exposing details to caller
+            log.error("Failed to process reset email for request: {}", ex.getMessage());
         }
 
-        return new MessageResponse("If an account with this email exists, a password reset code has been sent.");
+        return new MessageResponse("If the account is eligible, password-reset instructions will be sent.");
     }
 
     /**
-     * Validates the 6-digit code, hashes the new password, and updates the user.
-     */
-    /**
-     * Validates the 6-digit code, hashes the new password, updates the user, and consumes the code.
+     * Validates reset code, updates password, and sends best-effort confirmation.
      */
     public MessageResponse confirmPasswordReset(ResetPasswordConfirmRequest req) {
         // 1. Validate the code without consuming it yet
@@ -145,19 +144,22 @@ public class AuthService {
         // 2. Hash the new password
         String hashedPassword = passwordEncoder.encode(req.newPassword());
 
-        // 3. Update the password in the database
+        // 3. Update the password in database
         try {
             userService.resetPassword(req.email(), hashedPassword);
         } catch (UserNotFoundException ex) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found.");
         }
 
-        // 4. Consume/invalidate code ONLY after DB update succeeds
+        // 4. Invalidate/consume the code only after DB update succeeds
         passwordResetTokenService.consumeCode(req.email());
-        // 5. Send confirmation email that password was changed
-        emailNotificationService.sendPasswordChangedConfirmation(req.email());
 
-        
+        // 5. Best-effort confirmation email: failure does not rollback password update
+        try {
+            emailNotificationService.sendPasswordChangedConfirmation(req.email());
+        } catch (Exception ex) {
+            log.error("Failed to send password-change confirmation email to recipient: {}", ex.getMessage());
+        }
+
         return new MessageResponse("Password has been successfully reset. You can now log in with your new password.");
-    }
-}
+    }}

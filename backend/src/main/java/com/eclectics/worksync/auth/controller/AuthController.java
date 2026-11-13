@@ -13,16 +13,20 @@ import com.eclectics.worksync.auth.dto.ForgotPasswordRequest;
 import com.eclectics.worksync.auth.dto.MessageResponse;
 import com.eclectics.worksync.auth.dto.ResetPasswordConfirmRequest;
 import com.eclectics.worksync.users.dto.UserResponse;
+import com.eclectics.worksync.auth.service.RateLimiterService;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.web.server.ResponseStatusException;
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
 
-    private final AuthService authService;
+   private final AuthService authService;
+    private final RateLimiterService rateLimiterService;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, RateLimiterService rateLimiterService) {
         this.authService = authService;
+        this.rateLimiterService = rateLimiterService;
     }
-
     /**
      * Public self-registration endpoint.
      * Path: POST /api/v1/auth/register
@@ -42,8 +46,25 @@ public class AuthController {
         AuthResponse response = authService.login(request);
         return ResponseEntity.ok(response);
     }
-    @PostMapping("/forgot-password")
-    public ResponseEntity<MessageResponse> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+  @PostMapping("/forgot-password")
+    public ResponseEntity<MessageResponse> forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequest request,
+            HttpServletRequest servletRequest) {
+
+        // 1. Extract IP (supports proxies / cloud load balancers)
+        String clientIp = servletRequest.getHeader("X-Forwarded-For");
+        if (clientIp == null || clientIp.isBlank()) {
+            clientIp = servletRequest.getRemoteAddr();
+        } else {
+            clientIp = clientIp.split(",")[0].trim();
+        }
+
+        // 2. Reject if this IP has flooded requests (returns 429 Too Many Requests)
+        if (!rateLimiterService.isIpAllowed(clientIp)) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Please try again later.");
+        }
+
+        // 3. Delegate to service
         MessageResponse response = authService.requestPasswordReset(request);
         return ResponseEntity.ok(response);
     }
