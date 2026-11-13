@@ -4,20 +4,35 @@ info:
   version: 0.2.0
   description: |
     Proposed, contract-first API for the initial Authentication, Users, and
-    Notifications milestone. All operations are planned until implemented.
+    Notifications milestone. Users Step 5B implements GET/PUT /users/me and
+    GET /admin/users and /admin/users/{userId} on feature/users-rest-endpoints.
+    Auth registration, login and password-reset endpoints are implemented in main,
+    not by Users Step 5B. This Users branch predates that merge.
+    Other Users/Notifications operations remain planned.
+    Auth-owned operation definitions below remain draft contracts; see
+    docs/api-contract.md for the existing password-reset path mismatch.
 
-    Draft decisions for team review (not implemented):
+    Milestone design and draft future scope (not all implemented):
     - Spring Boot API and Blazor WebAssembly frontend.
     - JWT Bearer access tokens (not cookie-based sessions).
     - Public self-registration with first name, last name, email, phone number,
       and password. Accounts begin as PENDING_APPROVAL with system role USER.
-    - An administrator approves or rejects registrations and may grant
-      organization-level permissions such as PROJECT_CREATE.
-    - PENDING_APPROVAL users may authenticate but have access ONLY to their own
-      profile and account-related notifications. No company data or admin APIs.
+    - Administrator approval/rejection endpoints and organization-level
+      permission grants such as PROJECT_CREATE remain planned.
+    - Updated main SecurityConfig allows PENDING_APPROVAL users to GET and PUT
+      /users/me. /api/v1/notifications/** requires STATUS_ACTIVE; pending users
+      cannot access notifications. Administrator routes require ROLE_ADMIN and
+      STATUS_ACTIVE. This branch still has the older notification access rule.
     - ADMIN is a system-level role; project Manager/Member/Viewer roles will be
       implemented later as project-specific memberships.
-    - No boolean-valued permission flags: additional permissions are strings.
+    - Future additional permissions are planned as strings, not boolean flags.
+
+    Automated tests:
+    - Updated main Auth requires EmailNotificationService, and shared configuration
+      includes the email profile. Tests must mock email delivery and never use live
+      SMTP. Do not rely on an absent email profile to prevent delivery.
+    - This branch predates those Auth configuration changes; see the Users test
+      setup in docs/users-rest-endpoints.md. No Auth code changes are made here.
 
     Security and production notes:
     - Bootstrap the first administrator through a secure, one-time setup;
@@ -96,8 +111,9 @@ paths:
       summary: Authenticate with email and password
       description: |
         Returns a short-lived JWT Bearer access token for ACTIVE users.
-        PENDING_APPROVAL users can also receive a token but MUST be restricted
-        server-side to /users/me, PUT /users/me and their own notifications.
+        PENDING_APPROVAL users can also receive a token but may only GET and PUT
+        /users/me under updated main SecurityConfig. Notification access requires
+        STATUS_ACTIVE; pending accounts cannot access notifications.
         REJECTED and BLOCKED accounts cannot obtain new access tokens.
         The response user record helps Blazor select the correct dashboard;
         the backend remains authoritative for every access decision.
@@ -150,6 +166,7 @@ paths:
           description: The presented access token has been revoked.
         '401':
           $ref: '#/components/responses/Unauthorized'
+
   /auth/password-reset/request:
     post:
       tags: [Authentication]
@@ -208,25 +225,33 @@ paths:
                 $ref: '#/components/schemas/ApiError'
         '404':
           $ref: '#/components/responses/NotFound'
+
   /users/me:
     get:
       tags: [Users]
+      x-implementation-status: implemented-users-step-5b-part-1
       operationId: getMyProfile
       summary: Get my account and profile
-      description: Available to authenticated ACTIVE and PENDING_APPROVAL users.
+      description: |
+        Available to authenticated ACTIVE and PENDING_APPROVAL users.
+        Identity comes from WorkSyncPrincipal, never a query/body user ID.
+        BLOCKED/REJECTED tokens receive 401 under the existing Auth filter.
       responses:
         '200':
           description: The authenticated user's safe account details.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserRecord'
+                $ref: '#/components/schemas/UserResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
     put:
       tags: [Users]
+      x-implementation-status: implemented-users-step-5b-part-1
       operationId: updateMyProfile
       summary: Update my basic profile
       description: |
@@ -234,6 +259,8 @@ paths:
         status, permission grants, or email via this endpoint. Email changes
         require a separate verification process in a later milestone.
         Available to authenticated ACTIVE and PENDING_APPROVAL users.
+        Identity comes from WorkSyncPrincipal. Unknown JSON properties are rejected.
+        BLOCKED/REJECTED tokens receive 401 under the existing Auth filter.
       requestBody:
         required: true
         content:
@@ -246,21 +273,27 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserRecord'
+                $ref: '#/components/schemas/UserResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /admin/users:
     get:
       tags: [Administration]
       x-required-role: ADMIN
+      x-implementation-status: implemented-users-step-5b-part-1
       operationId: listUsersForAdmin
       summary: List users, including pending registrations
-      description: ADMIN role required. Results are paginated.
+      description: |
+        ACTIVE ADMIN required. Paginated; ordered by createdAt DESC, id DESC.
+        Authenticated USER or pending ADMIN receives 403.
+        BLOCKED/REJECTED tokens receive 401 under the existing Auth filter.
       parameters:
         - name: status
           in: query
@@ -292,6 +325,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PagedUsers'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -301,17 +336,28 @@ paths:
     get:
       tags: [Administration]
       x-required-role: ADMIN
+      x-implementation-status: implemented-users-step-5b-part-1
       operationId: getUserForAdmin
       summary: Retrieve an account for administration
+      description: |
+        ACTIVE ADMIN required. Authenticated USER or pending ADMIN receives 403.
+        BLOCKED/REJECTED tokens receive 401 under the existing Auth filter.
       parameters:
-        - $ref: '#/components/parameters/UserId'
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
       responses:
         '200':
           description: User account found.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserRecord'
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -323,6 +369,7 @@ paths:
     patch:
       tags: [Administration]
       x-required-role: ADMIN
+      x-implementation-status: planned
       operationId: approveUser
       summary: Approve a pending registration
       description: |
@@ -351,6 +398,7 @@ paths:
     patch:
       tags: [Administration]
       x-required-role: ADMIN
+      x-implementation-status: planned
       operationId: rejectUser
       summary: Reject a pending registration
       description: |
@@ -384,6 +432,7 @@ paths:
     patch:
       tags: [Administration]
       x-required-role: ADMIN
+      x-implementation-status: planned
       operationId: changeUserBlockStatus
       summary: Block or unblock an existing active account
       description: |
@@ -421,6 +470,7 @@ paths:
     patch:
       tags: [Administration]
       x-required-role: ADMIN
+      x-implementation-status: planned
       operationId: updateUserPermissions
       summary: Set additional organization-level permissions
       x-implementation-phase: later
@@ -457,6 +507,7 @@ paths:
     patch:
       tags: [Administration]
       x-required-role: ADMIN
+      x-implementation-status: planned
       operationId: updateUserSystemRole
       summary: Assign an organization-level role
       x-implementation-phase: later
@@ -499,11 +550,13 @@ paths:
   /notifications:
     get:
       tags: [Notifications]
+      x-implementation-status: planned
       operationId: getMyNotifications
       summary: Get my in-app notifications
       description: |
-        Returns notifications ONLY for the authenticated user. ACTIVE and
-        PENDING_APPROVAL users can view their own account-related notifications.
+        Planned endpoint: requires STATUS_ACTIVE and returns notifications ONLY
+        for the authenticated user. PENDING_APPROVAL accounts cannot access it,
+        including account-related notifications.
         Admins may also receive notifications for new registrations.
       parameters:
         - name: status
@@ -541,11 +594,13 @@ paths:
   /notifications/{notificationId}/read:
     patch:
       tags: [Notifications]
+      x-implementation-status: planned
       operationId: markMyNotificationRead
       summary: Mark one of my notifications as read
       description: |
-        The notification must belong to the authenticated user. Another
-        user's notification must never be modified, even if its ID is known.
+        Planned endpoint: requires STATUS_ACTIVE; PENDING_APPROVAL accounts
+        cannot access it. The notification must belong to the authenticated user.
+        Another user's notification must never be modified, even if its ID is known.
       parameters:
         - $ref: '#/components/parameters/NotificationId'
       responses:
@@ -721,6 +776,40 @@ components:
       enum: [PROJECT_CREATE]
       example: PROJECT_CREATE
 
+    UserResponse:
+      type: object
+      description: Safe public/admin representation. Never contains password hashes.
+      required: [id, firstName, lastName, email, phoneNumber, role, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        firstName:
+          type: string
+          example: Jane
+        lastName:
+          type: string
+          example: Doe
+        email:
+          type: string
+          format: email
+          example: jane.doe@example.com
+        phoneNumber:
+          type: string
+          example: '+254712345678'
+        role:
+          $ref: '#/components/schemas/SystemRole'
+        status:
+          $ref: '#/components/schemas/AccountStatus'
+        createdAt:
+          type: string
+          format: date-time
+          example: '2026-11-10T08:30:00Z'
+        updatedAt:
+          type: string
+          format: date-time
+          example: '2026-11-10T08:30:00Z'
+
     UserRecord:
       type: object
       description: Safe public/admin representation. Never contains password hashes.
@@ -785,12 +874,13 @@ components:
 
     PagedUsers:
       type: object
+      description: Stable Users list envelope; represented by UserPageResponse in Java.
       required: [content, page, size, totalElements]
       properties:
         content:
           type: array
           items:
-            $ref: '#/components/schemas/UserRecord'
+            $ref: '#/components/schemas/UserResponse'
         page:
           type: integer
           minimum: 0
@@ -798,6 +888,7 @@ components:
         size:
           type: integer
           minimum: 1
+          maximum: 100
           example: 20
         totalElements:
           type: integer
@@ -969,6 +1060,7 @@ components:
         message:
           type: string
           example: 'If an account with this email exists, a password reset code has been sent.'
+
     FieldError:
       type: object
       required: [field, message]

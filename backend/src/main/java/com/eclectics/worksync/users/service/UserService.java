@@ -173,6 +173,12 @@ public class UserService {
         return repository.findByStatus(status, pageable).map(UserResponse::from);
     }
 
+    /** Internal administrator listing without a status filter; caller authorization is still required. */
+    public Page<UserResponse> getUsers(Pageable pageable) {
+        Objects.requireNonNull(pageable, "pageable is required");
+        return repository.findAll(pageable).map(UserResponse::from);
+    }
+
     private User requireUser(UUID userId) {
         Objects.requireNonNull(userId, "userId is required");
         return repository.findById(userId).orElseThrow(UserNotFoundException::new);
