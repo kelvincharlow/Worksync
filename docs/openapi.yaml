@@ -4,7 +4,8 @@ info:
   version: 0.2.0
   description: |
     Proposed, contract-first API for the initial Authentication, Users, and
-    Notifications milestone. All operations are planned until implemented.
+    Notifications milestone. Users Step 5B implements GET/PUT /users/me and
+    GET /admin/users and /admin/users/{userId}; other contracts remain draft.
 
     Draft decisions for team review (not implemented):
     - Spring Boot API and Blazor WebAssembly frontend.
@@ -220,11 +221,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserRecord'
+                $ref: '#/components/schemas/UserResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
     put:
       tags: [Users]
       operationId: updateMyProfile
@@ -246,13 +249,15 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserRecord'
+                $ref: '#/components/schemas/UserResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /admin/users:
     get:
@@ -260,7 +265,7 @@ paths:
       x-required-role: ADMIN
       operationId: listUsersForAdmin
       summary: List users, including pending registrations
-      description: ADMIN role required. Results are paginated.
+      description: ACTIVE ADMIN required. Paginated; ordered by createdAt DESC, id DESC.
       parameters:
         - name: status
           in: query
@@ -292,6 +297,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PagedUsers'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -303,15 +310,23 @@ paths:
       x-required-role: ADMIN
       operationId: getUserForAdmin
       summary: Retrieve an account for administration
+      description: ACTIVE ADMIN required.
       parameters:
-        - $ref: '#/components/parameters/UserId'
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
       responses:
         '200':
           description: User account found.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserRecord'
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -721,6 +736,40 @@ components:
       enum: [PROJECT_CREATE]
       example: PROJECT_CREATE
 
+    UserResponse:
+      type: object
+      description: Safe public/admin representation. Never contains password hashes.
+      required: [id, firstName, lastName, email, phoneNumber, role, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        firstName:
+          type: string
+          example: Jane
+        lastName:
+          type: string
+          example: Doe
+        email:
+          type: string
+          format: email
+          example: jane.doe@example.com
+        phoneNumber:
+          type: string
+          example: '+254712345678'
+        role:
+          $ref: '#/components/schemas/SystemRole'
+        status:
+          $ref: '#/components/schemas/AccountStatus'
+        createdAt:
+          type: string
+          format: date-time
+          example: '2026-11-10T08:30:00Z'
+        updatedAt:
+          type: string
+          format: date-time
+          example: '2026-11-10T08:30:00Z'
+
     UserRecord:
       type: object
       description: Safe public/admin representation. Never contains password hashes.
@@ -790,7 +839,7 @@ components:
         content:
           type: array
           items:
-            $ref: '#/components/schemas/UserRecord'
+            $ref: '#/components/schemas/UserResponse'
         page:
           type: integer
           minimum: 0

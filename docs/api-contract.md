@@ -1,10 +1,10 @@
 # Module 1 API contract
 
-**Status: DRAFT FOR TEAM REVIEW. All endpoints are PLANNED, not implemented.** The repository is a project skeleton; it has no business APIs or Worksync authentication flow.
+**Status: Draft with Users Step 5B Part 1 implemented on this branch.** GET/PUT /users/me and GET /admin/users and /admin/users/{userId} are implemented. Auth code from the Auth feature branch is reused unchanged; the remaining planned Users/Notifications routes below are not implemented by this step.
 
 [openapi.yaml](openapi.yaml) records the supplied OpenAPI 3.0.3 contract, version 0.2.0. It is the detailed schema reference for review. [Contract review notes](module1-contract-review-notes.md) record the supplied scope and security considerations. Agree changes in a pull request before implementing controllers or frontend clients.
 
-## Planned endpoints
+## Endpoint scope
 
 Base URL: `http://localhost:8080/api/v1`. JSON requests/responses. Protected operations use `Authorization: Bearer <JWT>` once implemented; public registration/login explicitly opt out. Every admin operation requires ADMIN plus an account status permitted to perform it.
 
@@ -12,10 +12,10 @@ Base URL: `http://localhost:8080/api/v1`. JSON requests/responses. Protected ope
 | --- | --- | --- |
 | PLANNED | POST /auth/register | Public; 201 safe UserRecord, PENDING_APPROVAL/USER, no token |
 | PLANNED | POST /auth/login | Public; 200 accessToken, tokenType, expiresIn and safe user |
-| PLANNED | GET /users/me | Own profile; ACTIVE or PENDING_APPROVAL |
-| PLANNED | PUT /users/me | Update own names and phone number only; ACTIVE or PENDING_APPROVAL |
-| PLANNED | GET /admin/users | ADMIN; optional status filter and pagination |
-| PLANNED | GET /admin/users/{userId} | ADMIN; retrieve one account |
+| IMPLEMENTED | GET /users/me | Own profile; ACTIVE or PENDING_APPROVAL |
+| IMPLEMENTED | PUT /users/me | Update own names and phone number only; ACTIVE or PENDING_APPROVAL |
+| IMPLEMENTED | GET /admin/users | ADMIN; optional status filter and pagination |
+| IMPLEMENTED | GET /admin/users/{userId} | ADMIN; retrieve one account |
 | PLANNED | PATCH /admin/users/{userId}/approve | ADMIN; PENDING_APPROVAL → ACTIVE |
 | PLANNED | PATCH /admin/users/{userId}/reject | ADMIN; PENDING_APPROVAL → REJECTED; optional reason |
 | PLANNED | PATCH /admin/users/{userId}/status | ADMIN; ACTIVE ↔ BLOCKED; never a substitute for approval |
@@ -27,11 +27,18 @@ Base URL: `http://localhost:8080/api/v1`. JSON requests/responses. Protected ope
 
 In-app notifications are first-milestone work if feasible, not part of the skeleton. The YAML explicitly marks the three later operations with `x-implementation-phase: later`.
 
-## Request and response expectations
+## Implemented Users behavior
+
+See [Users REST endpoints](users-rest-endpoints.md) for the exact security and response contract.
+These four operations return UserResponse: UUID id, firstName, lastName, email,
+phoneNumber, role, status, createdAt and updatedAt. No permissions or credentials.
+The administrator list wraps these in content/page/size/totalElements.
+
+## Draft request and response expectations
 
 - Registration requires **all five** fields: firstName, lastName, email, phoneNumber and password. Names: 1–80 characters; email: valid format, at most 254 characters; phoneNumber: E.164 (for example `+254712345678`); password: 12–128 characters. Do not silently trim/truncate passwords. Public registration cannot set role, status or permissions.
 - Login accepts email/password. AuthResponse contains accessToken, tokenType `Bearer`, expiresIn in seconds and a safe user. The example 900-second lifetime is illustrative. Pending users can obtain tokens but remain restricted by the backend. BLOCKED/REJECTED accounts cannot obtain tokens.
-- UserRecord contains opaque string id, firstName, lastName, email, phoneNumber, **role** (singular), status, permissions and createdAt; updatedAt is optional. IDs are strings, not a UUID contract. Passwords and hashes never appear in responses.
+- The draft UserRecord (used by other planned contracts) contains opaque string id, firstName, lastName, email, phoneNumber, **role** (singular), status, permissions and createdAt; updatedAt is optional. IDs are strings, not a UUID contract. Passwords and hashes never appear in responses.
 - Profile PUT requires firstName, lastName and phoneNumber. It cannot change email, role, status or permission grants. Email changes require a later verification flow.
 - Account statuses: PENDING_APPROVAL, ACTIVE, REJECTED, BLOCKED. System roles: USER, ADMIN. Additional permissions are unique strings, initially PROJECT_CREATE; approval does not grant it. Project roles are separate future memberships.
 - List responses contain **content**, page, size and totalElements. Pages are zero-based; size defaults to 20 and is bounded to 1–100. User lists support an account status filter; notifications support READ/UNREAD status.

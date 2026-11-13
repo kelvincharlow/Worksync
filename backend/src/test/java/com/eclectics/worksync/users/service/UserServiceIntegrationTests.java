@@ -135,6 +135,27 @@ class UserServiceIntegrationTests {
     }
 
     @Test
+    void unfilteredListingPaginatesAcrossAccountStatuses() {
+        var first = service.createPendingUser(new CreateUserCommand(
+                "Jane", "Doe", "a@example.com", "+254712345678", HASH_FIXTURE));
+        service.approveUser(first.id());
+        service.createPendingUser(new CreateUserCommand(
+                "Jane", "Doe", "b@example.com", "+254712345678", HASH_FIXTURE));
+        entityManager.clear();
+        var request = PageRequest.of(0, 1, Sort.by("email"));
+
+        var page = service.getUsers(request);
+        var next = service.getUsers(request.next());
+
+        assertThat(page.getTotalElements()).isEqualTo(2);
+        assertThat(page.getContent()).extracting(UserResponse::status).containsExactly(AccountStatus.ACTIVE);
+        assertThat(next.getContent()).extracting(UserResponse::status)
+                .containsExactly(AccountStatus.PENDING_APPROVAL);
+        assertThat(page.getContent()).extracting(UserResponse::email).containsExactly("a@example.com");
+        assertThat(next.getContent()).extracting(UserResponse::email).containsExactly("b@example.com");
+    }
+
+    @Test
     void passwordResetPersistsNewHashForAuthWithoutChangingOtherAccountFields() {
         var created = service.createPendingUser(command());
         service.approveUser(created.id());
