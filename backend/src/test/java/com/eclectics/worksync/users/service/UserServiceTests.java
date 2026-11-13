@@ -45,6 +45,7 @@ class UserServiceTests {
     private static final String HASH_FIXTURE = "encoded-hash-fixture";
     private static ValidatorFactory validatorFactory;
     @Mock UserRepository repository;
+    @Mock jakarta.persistence.EntityManager entityManager;
     private UserService service;
 
     @BeforeAll
@@ -59,7 +60,7 @@ class UserServiceTests {
 
     @BeforeEach
     void setUp() {
-        service = new UserService(repository, validatorFactory.getValidator());
+        service = new UserService(repository, validatorFactory.getValidator(), entityManager);
     }
 
     @Test
@@ -209,6 +210,10 @@ class UserServiceTests {
         when(repository.findById(id)).thenReturn(Optional.of(user));
         when(repository.saveAndFlush(user)).thenReturn(user);
 
+        if ("block".equals(operation)) {
+            // Successful administrator blocking requires another active administrator.
+            when(repository.countByRoleAndStatus(SystemRole.ADMIN, AccountStatus.ACTIVE)).thenReturn(2L);
+        }
         var response = changeStatus(operation, id);
 
         assertThat(response.status()).isEqualTo(expectedStatus);

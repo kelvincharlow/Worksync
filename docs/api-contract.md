@@ -1,19 +1,16 @@
 # Module 1 API contract
 
-**Status: Auth is implemented in main; Users Step 5B Part 1 is implemented on
-`feature/users-rest-endpoints`.** The four Users operations are GET/PUT /users/me,
-GET /admin/users and GET /admin/users/{userId}.
-
-Auth registration, login and password-reset endpoints were implemented by the Auth
-module and merged into main; they were not implemented by Users Step 5B.
-The Users branch was created before that merge. The remaining Users/Notifications
-endpoints below are still planned.
+**Status: Auth is implemented in main; Users Step 5B Parts 1 and 2 are implemented
+on the current `feature/users-admin-actions` branch.** Part 1 provides profile and
+administrator reads; Part 2 adds approval, rejection and block/unblock endpoints.
+Auth registration, login and password-reset behavior is reused unchanged.
+Future role/permission management and in-app Notifications endpoints remain planned.
 
 [openapi.yaml](openapi.yaml) records the supplied OpenAPI 3.0.3 contract, version 0.2.0. It is the detailed schema reference for review. [Contract review notes](module1-contract-review-notes.md) record the supplied scope and security considerations. Agree changes in a pull request before implementing controllers or frontend clients.
 
 ## Endpoint scope
 
-Base URL: `http://localhost:8080/api/v1`. JSON requests/responses. The four implemented Users operations use `Authorization: Bearer <JWT>`; public Auth registration/login opt out. Both implemented administrator read operations require `ROLE_ADMIN` and `STATUS_ACTIVE`.
+Base URL: `http://localhost:8080/api/v1`. JSON requests/responses. The implemented Users operations use `Authorization: Bearer <JWT>`; public Auth registration/login opt out. All administrator operations require `ROLE_ADMIN` and `STATUS_ACTIVE`.
 
 | Status | Method and path | Behavior / draft contract |
 | --- | --- | --- |
@@ -25,9 +22,9 @@ Base URL: `http://localhost:8080/api/v1`. JSON requests/responses. The four impl
 | IMPLEMENTED — USERS FEATURE BRANCH | PUT /users/me | Update own names and phone number only; ACTIVE or PENDING_APPROVAL |
 | IMPLEMENTED — USERS FEATURE BRANCH | GET /admin/users | ACTIVE ADMIN; optional status filter and pagination |
 | IMPLEMENTED — USERS FEATURE BRANCH | GET /admin/users/{userId} | ACTIVE ADMIN; retrieve one account; 404 if absent |
-| PLANNED | PATCH /admin/users/{userId}/approve | ADMIN; PENDING_APPROVAL → ACTIVE |
-| PLANNED | PATCH /admin/users/{userId}/reject | ADMIN; PENDING_APPROVAL → REJECTED; optional reason |
-| PLANNED | PATCH /admin/users/{userId}/status | ADMIN; ACTIVE ↔ BLOCKED; never a substitute for approval |
+| IMPLEMENTED — USERS FEATURE BRANCH | PATCH /admin/users/{userId}/approve | ACTIVE ADMIN; PENDING_APPROVAL → ACTIVE |
+| IMPLEMENTED — USERS FEATURE BRANCH | PATCH /admin/users/{userId}/reject | ACTIVE ADMIN; PENDING_APPROVAL → REJECTED; optional reason |
+| IMPLEMENTED — USERS FEATURE BRANCH | PATCH /admin/users/{userId}/status | ACTIVE ADMIN; ACTIVE ↔ BLOCKED; never a substitute for approval |
 | PLANNED | GET /notifications | ACTIVE only; own notifications; PENDING_APPROVAL denied |
 | PLANNED | PATCH /notifications/{notificationId}/read | ACTIVE only; own notification only; 200 updated NotificationRecord |
 | PLANNED — LATER | POST /auth/logout | Actually revoke presented JWT; 204 only after revocation |
@@ -39,7 +36,7 @@ In-app notification endpoints remain planned. The YAML explicitly marks the thre
 ## Implemented Users behavior
 
 See [Users REST endpoints](users-rest-endpoints.md) for the exact security and response contract.
-These four operations return UserResponse: UUID id, firstName, lastName, email,
+The implemented single-user operations return UserResponse: UUID id, firstName, lastName, email,
 phoneNumber, role, status, createdAt and updatedAt. No permissions or credentials.
 The administrator list wraps these in content/page/size/totalElements (`UserPageResponse`
 in Java, `PagedUsers` in OpenAPI). Its optional `status` filter uses AccountStatus;
@@ -53,7 +50,7 @@ The current user's UUID comes only from WorkSyncPrincipal.
 Missing, invalid or expired authentication returns 401. Auth's existing filter
 also declines authentication for BLOCKED/REJECTED accounts, resulting in 401.
 Authenticated ordinary USER accounts and pending ADMIN accounts receive 403 on
-administrator reads. Users validation/missing-user errors use safe
+administrator operations. Users validation/missing-user errors use safe
 code/message/timestamp JSON with 400/404; Auth's 401/403 responses retain their
 existing format.
 
@@ -70,10 +67,36 @@ configuration includes the email profile. Automated tests must replace email
 delivery with a mock; they must never use live SMTP. See the
 [Users test setup](users-rest-endpoints.md#automated-test-setup) for details.
 
-This Users branch predates the Auth merge: its current local SecurityConfig still
-allows pending notification access, and its local Auth email dependency/configuration
-still use the older setup. The rules above describe updated main, not verification
-of those changes on this branch. No code or branch integration is performed here.
+## Administrator account lifecycle — Part 2
+
+- PATCH /admin/users/{userId}/approve: PENDING_APPROVAL → ACTIVE.
+- PATCH /admin/users/{userId}/reject: PENDING_APPROVAL → REJECTED; optional JSON
+  `{"reason":"..."}`, at most 500 characters. An omitted body or empty object is valid.
+- PATCH /admin/users/{userId}/status: required JSON `{"status":"BLOCKED"}` or
+  `{"status":"ACTIVE"}`; optional reason of at most 500 characters. Only ACTIVE →
+  BLOCKED and BLOCKED → ACTIVE are supported; this cannot approve or restore rejected users.
+
+Unknown JSON properties on reason/status requests are rejected with 400. Reasons are
+validated but not stored, logged or sent in notifications; no reason persistence,
+audit trail or notification delivery is implemented. Responses contain only UserResponse.
+
+The acting UUID comes from WorkSyncPrincipal. Auth's route chain requires ROLE_ADMIN
+and STATUS_ACTIVE; the service rechecks these from current database state under a
+transaction lock. Self-blocking and blocking the last ACTIVE ADMIN return safe 409
+errors. Invalid transitions return 409; missing targets return 404; invalid requests
+return 400. Auth retains its existing 401/403 handling.
+
+PostgreSQL transaction advisory lock (1465075027, 1) serializes Users updates across
+instances until commit/rollback. The active-admin count and block occur under that
+lock, including the trusted one-argument service method. Profile/password writes use
+the same lock and refresh managed entities so stale full-row updates cannot restore
+an earlier account status. These operations require READ_COMMITTED and fail closed
+when joined to a higher-isolation outer transaction. No schema migration is needed.
+
+Future Users write paths, role changes or administrator maintenance tools must follow
+this locking protocol. Direct SQL bypasses application safeguards. Serializing Users
+updates trades write throughput for a simple consistent invariant; reads remain unlocked.
+The guard preserves an existing active administrator; it does not provision the first one.
 
 ## Auth-owned password-reset path mismatch
 
@@ -102,6 +125,6 @@ Expected error statuses: 400 invalid input, 401 invalid/missing/expired authenti
 
 ## Team decisions still needed before implementation
 
-Finalize JWT signing/key rotation, token lifetime, browser storage, CORS/CSRF behavior, prompt status/role/permission changes on existing tokens, and the later revocation/refresh strategy. Browser token disposal must not be presented as server-side revocation. Define secure one-time first-admin provisioning, self-lockout/final-admin protection, audit logging and email normalization/uniqueness. For future endpoints, agree pagination sorting and detailed validation behavior. The implemented Users reads already use fixed ordering, and profile updates reject whitespace-only names. The supplied YAML is a draft and some operations do not yet enumerate malformed-input or blocked-token error cases; review those before implementation.
+Finalize JWT signing/key rotation, token lifetime, browser storage, CORS/CSRF behavior, prompt status/role/permission changes on existing tokens, and the later revocation/refresh strategy. Browser token disposal must not be presented as server-side revocation. Define secure one-time first-admin provisioning, audit logging and email normalization/uniqueness. For future endpoints, agree pagination sorting and detailed validation behavior. The implemented Users reads already use fixed ordering, and profile updates reject whitespace-only names. The supplied YAML is a draft and some operations do not yet enumerate malformed-input or blocked-token error cases; review those before implementation.
 
 Email verification, rate limiting/abuse protection, administrator MFA as appropriate, and a complete token lifecycle policy remain production-readiness work outside Users Step 5B. Password-reset code is implemented in main, with the path mismatch noted above; this step does not assess its production readiness. Email delivery failure must not roll back an otherwise successful registration or approval.

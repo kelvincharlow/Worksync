@@ -96,6 +96,12 @@ class UserServiceIntegrationTests {
         var oldUpdatedAt = before.getUpdatedAt();
         var originalCreatedAt = before.getCreatedAt();
 
+        if ("block".equals(operation)) {
+            var backup = service.createPendingUser(new CreateUserCommand(
+                    "Backup", "Admin", "backup@example.com", "+254712345678", HASH_FIXTURE));
+            service.approveUser(backup.id());
+            jdbc.update("UPDATE users SET role = 'ADMIN' WHERE id = ?", backup.id());
+        }
         var response = changeStatus(operation, created.id());
         entityManager.clear();
         var loaded = repository.findById(created.id()).orElseThrow();

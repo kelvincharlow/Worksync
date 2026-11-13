@@ -231,4 +231,125 @@ class UserControllerSecurityTests {
                 .andExpect(status().isUnauthorized());
         verifyNoInteractions(service);
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"approve", "reject", "block", "unblock"})
+    void activeAdminCanChangeAccountStatus(String action) throws Exception {
+        String authorization = bearer(SystemRole.ADMIN, AccountStatus.ACTIVE);
+        AccountStatus destination = switch (action) {
+            case "reject" -> AccountStatus.REJECTED;
+            case "block" -> AccountStatus.BLOCKED;
+            default -> AccountStatus.ACTIVE;
+        };
+        UserResponse response = user(TARGET, SystemRole.USER, destination);
+        switch (action) {
+            case "approve" -> when(service.approveUser(ACTOR, TARGET)).thenReturn(response);
+            case "reject" -> when(service.rejectUser(ACTOR, TARGET)).thenReturn(response);
+            case "block" -> when(service.blockUser(ACTOR, TARGET)).thenReturn(response);
+            default -> when(service.unblockUser(ACTOR, TARGET)).thenReturn(response);
+        }
+        mvc.perform(actionRequest(action).header("Authorization", authorization))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value(destination.name()))
+                .andExpect(jsonPath("$.passwordHash").doesNotExist())
+                .andExpect(jsonPath("$.reason").doesNotExist());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"approve", "reject", "block", "unblock"})
+    void anonymousCannotChangeStatus(String action) throws Exception {
+        mvc.perform(actionRequest(action)).andExpect(status().isUnauthorized());
+        verifyNoInteractions(service);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"approve", "reject", "block", "unblock"})
+    void userAndPendingAdminCannotChangeStatus(String action) throws Exception {
+        mvc.perform(actionRequest(action).header("Authorization",
+                bearer(SystemRole.USER, AccountStatus.ACTIVE))).andExpect(status().isForbidden());
+        mvc.perform(actionRequest(action).header("Authorization",
+                bearer(SystemRole.ADMIN, AccountStatus.PENDING_APPROVAL))).andExpect(status().isForbidden());
+        verify(service, never()).approveUser(any(), any());
+        verify(service, never()).rejectUser(any(), any());
+        verify(service, never()).blockUser(any(), any());
+        verify(service, never()).unblockUser(any(), any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"approve", "reject", "block", "unblock"})
+    void disabledAccountsCannotChangeStatus(String action) throws Exception {
+        for (AccountStatus state : List.of(AccountStatus.BLOCKED, AccountStatus.REJECTED)) {
+            mvc.perform(actionRequest(action).header("Authorization", bearer(SystemRole.ADMIN, state)))
+                    .andExpect(status().isUnauthorized());
+        }
+    }
+
+    @Test
+    void rejectionAcceptsOptionalReasonWithoutChangingServiceContract() throws Exception {
+        String auth = bearer(SystemRole.ADMIN, AccountStatus.ACTIVE);
+        when(service.rejectUser(ACTOR, TARGET)).thenReturn(user(TARGET, SystemRole.USER, AccountStatus.REJECTED));
+        mvc.perform(patch("/api/v1/admin/users/" + TARGET + "/reject").header("Authorization", auth)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Optional explanation\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.reason").doesNotExist());
+        verify(service).rejectUser(ACTOR, TARGET);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{}", "{", "{\"status\":null}", "{\"status\":\"REJECTED\"}",
+            "{\"status\":\"PENDING_APPROVAL\"}", "{\"status\":\"ACTIVE\",\"role\":\"ADMIN\"}"})
+    void malformedOrUnsupportedStatusRequestIs400(String body) throws Exception {
+        mvc.perform(patch("/api/v1/admin/users/" + TARGET + "/status")
+                .header("Authorization", bearer(SystemRole.ADMIN, AccountStatus.ACTIVE))
+                .contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isBadRequest());
+        verify(service, never()).blockUser(any(), any());
+        verify(service, never()).unblockUser(any(), any());
+    }
+
+    @Test
+    void oversizedReasonsAndUnknownRejectionFieldsAre400() throws Exception {
+        String auth = bearer(SystemRole.ADMIN, AccountStatus.ACTIVE);
+        for (String endpoint : List.of("reject", "status")) {
+            String prefix = endpoint.equals("status") ? "\"status\":\"BLOCKED\"," : "";
+            mvc.perform(patch("/api/v1/admin/users/" + TARGET + "/" + endpoint)
+                    .header("Authorization", auth).contentType(MediaType.APPLICATION_JSON)
+                    .content("{" + prefix + "\"reason\":\"" + "x".repeat(501) + "\"}"))
+                    .andExpect(status().isBadRequest());
+        }
+        mvc.perform(patch("/api/v1/admin/users/" + TARGET + "/reject")
+                .header("Authorization", auth).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"role\":\"ADMIN\"}")).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void lifecycleExceptionsHaveSafe409Responses() throws Exception {
+        String auth = bearer(SystemRole.ADMIN, AccountStatus.ACTIVE);
+        when(service.approveUser(ACTOR, TARGET)).thenThrow(
+                new com.eclectics.worksync.users.exception.InvalidAccountStatusTransitionException());
+        mvc.perform(actionRequest("approve").header("Authorization", auth))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("INVALID_ACCOUNT_STATUS_TRANSITION"));
+        when(service.blockUser(ACTOR, TARGET)).thenThrow(
+                new com.eclectics.worksync.users.exception.ProtectedAdministratorOperationException());
+        mvc.perform(actionRequest("block").header("Authorization", auth))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PROTECTED_ADMINISTRATOR_OPERATION"));
+    }
+
+    @Test
+    void revokedServiceAuthorizationIs403AndMissingTargetIs404() throws Exception {
+        String auth = bearer(SystemRole.ADMIN, AccountStatus.ACTIVE);
+        when(service.rejectUser(ACTOR, TARGET)).thenThrow(new UserNotFoundException());
+        mvc.perform(actionRequest("reject").header("Authorization", auth)).andExpect(status().isNotFound());
+        when(service.approveUser(ACTOR, TARGET)).thenThrow(
+                new com.eclectics.worksync.users.exception.AdministratorAccessDeniedException());
+        mvc.perform(actionRequest("approve").header("Authorization", auth)).andExpect(status().isForbidden());
+    }
+
+    private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder actionRequest(String action) {
+        String path = "/api/v1/admin/users/" + TARGET + "/";
+        if (action.equals("block") || action.equals("unblock")) {
+            return patch(path + "status").contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"status\":\"" + (action.equals("block") ? "BLOCKED" : "ACTIVE") + "\"}");
+        }
+        return patch(path + action);
+    }
 }
