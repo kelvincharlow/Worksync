@@ -19,7 +19,13 @@ if (!Uri.TryCreate(apiBaseUrl, UriKind.Absolute, out var apiUri)
 // Register HttpClient once using the configuration value
 builder.Services.AddScoped(_ => new HttpClient { BaseAddress = apiUri });
 
-builder.Services.AddMudServices();
+builder.Services.AddMudServices(config =>
+{
+    config.SnackbarConfiguration.PositionClass = Defaults.Classes.Position.TopRight;
+    config.SnackbarConfiguration.VisibleStateDuration = 4000;
+    config.SnackbarConfiguration.ShowTransitionDuration = 200;
+    config.SnackbarConfiguration.HideTransitionDuration = 200;
+});
 
 builder.Services.AddScoped<AuthState>();
 

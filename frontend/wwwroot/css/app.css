@@ -277,3 +277,67 @@ main { max-width: 64rem; margin: 3rem auto; padding: 0 1.5rem; line-height: 1.6;
     color: #0F172A;
     text-decoration: underline;
 }
+/* Password Rules Box */
+.password-rules-box {
+    background-color: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    font-size: 0.85rem;
+    color: #334155;
+}
+.password-rules-box strong {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #0F172A;
+}
+.password-rules-box ul {
+    margin: 0;
+    padding-left: 20px;
+}
+.password-rules-box li {
+    margin-bottom: 4px;
+}
+
+/* Password Input with Show Toggle */
+.password-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.password-input-wrapper .form-control {
+    padding-right: 60px; /* Make room for the toggle */
+}
+.password-toggle {
+    position: absolute;
+    right: 16px;
+    background: none;
+    border: none;
+    color: #64748B;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 0;
+}
+.password-toggle:hover {
+    color: #0F172A;
+}
+
+/* Success Icon */
+.success-icon-wrapper {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background-color: #EEF2FF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 24px;
+}
+.success-icon-wrapper svg {
+    width: 32px;
+    height: 32px;
+    stroke: #6366F1;
+}

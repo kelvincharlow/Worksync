@@ -28,10 +28,10 @@ public class AuthApiService
         => PostAsync<AuthResponse>("auth/login", request);
 
     public Task<ApiResult<PasswordResetResponse>> RequestPasswordResetAsync(PasswordResetRequest request)
-        => PostAsync<PasswordResetResponse>("auth/password-reset/request", request);
+        => PostAsync<PasswordResetResponse>("auth/forgot-password", request);
 
     public Task<ApiResult<PasswordResetResponse>> ConfirmPasswordResetAsync(PasswordResetConfirmRequest request)
-        => PostAsync<PasswordResetResponse>("auth/password-reset/confirm", request);
+        => PostAsync<PasswordResetResponse>("auth/reset-password", request);
 
     // ─────────────────────────────────────────────────────────────
     // Authenticated endpoint (server-side revocation is "later"
