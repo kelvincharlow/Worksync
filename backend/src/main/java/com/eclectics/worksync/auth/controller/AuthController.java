@@ -17,6 +17,9 @@ import com.eclectics.worksync.auth.service.RateLimiterService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.server.ResponseStatusException;
 import com.eclectics.worksync.auth.dto.RefreshTokenRequest;
+import org.springframework.http.HttpHeaders;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import com.eclectics.worksync.auth.security.WorkSyncPrincipal;
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
@@ -55,6 +58,22 @@ public class AuthController {
     public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
         AuthResponse response = authService.refresh(request);
         return ResponseEntity.ok(response);
+    }
+    /**
+     * Server-side logout: revokes the presented access token and user's refresh tokens.
+     * Path: POST /api/v1/auth/logout
+     */
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(
+            @RequestHeader(HttpHeaders.AUTHORIZATION) String authHeader,
+            @AuthenticationPrincipal WorkSyncPrincipal principal) {
+
+        if (principal == null || authHeader == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required.");
+        }
+
+        authService.logout(authHeader, principal.userId());
+        return ResponseEntity.noContent().build(); // HTTP 204 No Content
     }
   @PostMapping("/forgot-password")
     public ResponseEntity<MessageResponse> forgotPassword(

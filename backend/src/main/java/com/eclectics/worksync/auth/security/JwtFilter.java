@@ -18,7 +18,7 @@ import com.eclectics.worksync.users.entity.AccountStatus;
 import com.eclectics.worksync.users.exception.UserNotFoundException;
 import com.eclectics.worksync.users.service.UserService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
-
+import com.eclectics.worksync.auth.service.TokenBlocklistService;
 import java.util.UUID;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -29,10 +29,11 @@ public class JwtFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final UserService userService;
-
-    public JwtFilter(JwtService jwtService, UserService userService) {
+    private final TokenBlocklistService tokenBlocklistService;
+    public JwtFilter(JwtService jwtService, UserService userService,TokenBlocklistService tokenBlocklistService) {
         this.jwtService = jwtService;
         this.userService = userService;
+        this.tokenBlocklistService = tokenBlocklistService;  
     }
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -46,7 +47,7 @@ public class JwtFilter extends OncePerRequestFilter {
             String token = authHeader.substring(7); // Remove "Bearer " prefix
 
             // 2. Validate token signature and expiration
-           if (jwtService.validateToken(token)) {
+        if (!tokenBlocklistService.isBlocked(token) && jwtService.validateToken(token)) {
                 try {
                     // 1. Extract and parse user UUID
                     String subject = jwtService.extractUserId(token);

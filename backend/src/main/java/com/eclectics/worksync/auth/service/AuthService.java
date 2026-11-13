@@ -23,6 +23,8 @@ import java.util.Collections;
 import com.eclectics.worksync.notifications.email.EmailNotificationService;
 import com.eclectics.worksync.auth.dto.RefreshTokenRequest;
 import com.eclectics.worksync.auth.service.RefreshTokenService.RotatedToken;
+import io.jsonwebtoken.Claims;
+import java.util.UUID;
 @Service
 public class AuthService {
 
@@ -34,18 +36,21 @@ public class AuthService {
     private final PasswordResetTokenService passwordResetTokenService;
     private final EmailNotificationService emailNotificationService;
      private final RefreshTokenService refreshTokenService;
+       private final TokenBlocklistService tokenBlocklistService;
     public AuthService(UserService userService,
                        PasswordEncoder passwordEncoder,
                        JwtService jwtService,
                        PasswordResetTokenService passwordResetTokenService,
                        EmailNotificationService emailNotificationService,
-                       RefreshTokenService refreshTokenService) {
+                       RefreshTokenService refreshTokenService,
+                    TokenBlocklistService tokenBlocklistService) {
         this.userService = userService;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.passwordResetTokenService = passwordResetTokenService;
         this.emailNotificationService = emailNotificationService;
          this.refreshTokenService = refreshTokenService;
+         this.tokenBlocklistService = tokenBlocklistService; 
     }
 
     /**
@@ -143,6 +148,20 @@ public class AuthService {
         int expiresIn = jwtService.getExpirationSeconds();
 
         return new AuthResponse(newAccessToken, rotated.newRawToken(), "Bearer", expiresIn, user);
+    }
+     public void logout(String authHeader, UUID userId) {
+        // 1. Extract raw token
+        String token = authHeader.startsWith("Bearer ") ? authHeader.substring(7) : authHeader;
+
+        // 2. Extract expiration time so the blocklist only keeps it as long as needed
+        Claims claims = jwtService.extractAllClaims(token);
+        java.time.Instant expiresAt = claims.getExpiration().toInstant();
+
+        // 3. Blocklist the access token
+        tokenBlocklistService.blockToken(token, expiresAt);
+
+        // 4. Revoke all active refresh tokens in the database
+        refreshTokenService.revokeAllForUser(userId);
     }
     public MessageResponse requestPasswordReset(ForgotPasswordRequest req) {
         try {
