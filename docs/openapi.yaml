@@ -150,7 +150,64 @@ paths:
           description: The presented access token has been revoked.
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /auth/password-reset/request:
+    post:
+      tags: [Authentication]
+      operationId: requestPasswordReset
+      summary: Request password reset code
+      description: |
+        Generates a 6-digit numeric reset code valid for 15 minutes and
+        dispatches it to the user's email.
+        Always returns 200 OK to prevent email harvesting.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+      responses:
+        '200':
+          description: Request received; email dispatched if user exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
 
+  /auth/password-reset/confirm:
+    post:
+      tags: [Authentication]
+      operationId: confirmPasswordReset
+      summary: Confirm password reset with email code
+      description: |
+        Verifies the 6-digit code against the user's email, updates the stored
+        password hash, and invalidates the code upon success.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordConfirmRequest'
+      responses:
+        '200':
+          description: Password reset successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Invalid or expired reset code, or password rules violated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /users/me:
     get:
       tags: [Users]
@@ -869,7 +926,49 @@ components:
           description: Optional field validation details; never include passwords.
           items:
             $ref: '#/components/schemas/FieldError'
+    ForgotPasswordRequest:
+      type: object
+      additionalProperties: false
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          example: jane.doe@example.com
 
+    ResetPasswordConfirmRequest:
+      type: object
+      additionalProperties: false
+      required: [email, resetCode, newPassword]
+      properties:
+        email:
+          type: string
+          format: email
+          example: jane.doe@example.com
+        resetCode:
+          type: string
+          pattern: '^\d{6}$'
+          minLength: 6
+          maxLength: 6
+          description: 6-digit numeric verification code sent to the email.
+          example: '583921'
+        newPassword:
+          type: string
+          format: password
+          minLength: 12
+          maxLength: 128
+          writeOnly: true
+          description: New password meeting length constraints.
+          example: 'A-long-example-password-123!'
+
+    MessageResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          example: 'If an account with this email exists, a password reset code has been sent.'
     FieldError:
       type: object
       required: [field, message]
