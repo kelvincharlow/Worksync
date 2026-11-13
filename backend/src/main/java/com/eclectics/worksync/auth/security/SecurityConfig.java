@@ -42,11 +42,11 @@ public class SecurityConfig {
                  AuthorityAuthorizationManager.hasAuthority("STATUS_ACTIVE")
     )
 )
+// 3. Only viewing own profile/approval status is allowed for PENDING_APPROVAL
+                .requestMatchers("/api/v1/users/me").authenticated()
 
-                // 3. Allowed routes for PENDING_APPROVAL and ACTIVE users
-                .requestMatchers("/api/v1/users/me", "/api/v1/notifications/**").authenticated()
-
-                // 4. All other endpoints require an ACTIVE account
+                // 4. Notifications and all other endpoints strictly require an ACTIVE account
+                .requestMatchers("/api/v1/notifications/**").hasAuthority("STATUS_ACTIVE")
                 .anyRequest().hasAuthority("STATUS_ACTIVE")
             )
             // 5. REST 401 and 403 handling

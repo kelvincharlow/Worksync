@@ -68,3 +68,7 @@ Use short feature branches and reviewed pull requests into `main`. CI builds/tes
 The supplied Module 1 draft is recorded in [OpenAPI](docs/openapi.yaml) and summarized in the [API contract](docs/api-contract.md). It proposes JWT login, required phone numbers, profile updates, registration approval/rejection and account blocking. JWT revocation/logout, permission grants and role changes are later-phase work. Next, the team should review the draft and split implementation tasks; the Users module currently includes entity, repository, dto, service and exception packages. All milestone endpoints are [PLANNED](docs/api-contract.md). Future scope includes projects, work items, agile planning, workflows, reporting, collaboration, customization and selected integrations. MongoDB remains a future architecture decision.
 
 Version references: [Spring Boot requirements](https://docs.spring.io/spring-boot/system-requirements.html), [.NET 10](https://dotnet.microsoft.com/en-us/download/dotnet/10.0).
+
+## Optional password-reset email delivery
+
+Notifications provides an internal EmailNotificationService for Auth integration. SMTP sending is explicitly enabled with the `email` Spring profile and environment settings; it is absent by default rather than a fake sender. See [email delivery setup, failure handling and tests](docs/email-delivery.md). No email endpoints, Auth workflow or in-app notification tables are implemented by this capability.
