@@ -45,10 +45,6 @@
 			<groupId>org.flywaydb</groupId>
 			<artifactId>flyway-database-postgresql</artifactId>
 		</dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-mail</artifactId>
-        </dependency>
 <!-- 3. JJWT for creating and reading JWT tokens -->
 <dependency>
     <groupId>io.jsonwebtoken</groupId>
