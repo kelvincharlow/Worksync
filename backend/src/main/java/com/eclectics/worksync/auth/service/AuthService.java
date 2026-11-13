@@ -21,6 +21,8 @@ import com.eclectics.worksync.auth.dto.MessageResponse;
 import com.eclectics.worksync.auth.dto.ResetPasswordConfirmRequest;
 import java.util.Collections;
 import com.eclectics.worksync.notifications.email.EmailNotificationService;
+import com.eclectics.worksync.auth.dto.RefreshTokenRequest;
+import com.eclectics.worksync.auth.service.RefreshTokenService.RotatedToken;
 @Service
 public class AuthService {
 
@@ -31,17 +33,19 @@ public class AuthService {
     private final JwtService jwtService;
     private final PasswordResetTokenService passwordResetTokenService;
     private final EmailNotificationService emailNotificationService;
-
+     private final RefreshTokenService refreshTokenService;
     public AuthService(UserService userService,
                        PasswordEncoder passwordEncoder,
                        JwtService jwtService,
                        PasswordResetTokenService passwordResetTokenService,
-                       EmailNotificationService emailNotificationService) {
+                       EmailNotificationService emailNotificationService,
+                       RefreshTokenService refreshTokenService) {
         this.userService = userService;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.passwordResetTokenService = passwordResetTokenService;
         this.emailNotificationService = emailNotificationService;
+         this.refreshTokenService = refreshTokenService;
     }
 
     /**
@@ -69,8 +73,8 @@ public class AuthService {
         }
     }
 
-    /**
-     * Authenticates with email and password, returning a JWT for ACTIVE or PENDING_APPROVAL users.
+   /**
+     * Authenticates with email and password, returning an Access Token and a Refresh Token.
      */
     public AuthResponse login(LoginRequest req) {
         // 1. Fetch credentials via UserService (returns 401 if user not found)
@@ -91,8 +95,8 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account is " + user.status() + ".");
         }
 
-        // 4. Generate JWT
-        String token = jwtService.generateToken(
+        // 4. Generate JWT Access Token
+        String accessToken = jwtService.generateToken(
                 user.id().toString(),
                 user.email(),
                 user.role().name(),
@@ -102,15 +106,44 @@ public class AuthService {
 
         int expiresIn = jwtService.getExpirationSeconds();
 
-        // 5. Fetch safe UserResponse for login response
+        // 5. Generate Refresh Token
+        String refreshToken = refreshTokenService.createRefreshToken(user.id());
+
+        // 6. Fetch safe UserResponse for login response
         UserResponse safeUser = userService.getUserById(user.id());
 
-        return new AuthResponse(token, "Bearer", expiresIn, safeUser);
+        return new AuthResponse(accessToken, refreshToken, "Bearer", expiresIn, safeUser);
     }
-   /**
-     * Generates a 6-digit reset code if eligible and dispatches email.
-     * Always returns the same generic message to prevent account enumeration.
+
+    /**
+     * Validates and rotates the refresh token, issuing a new access token and a new refresh token.
      */
+    public AuthResponse refresh(RefreshTokenRequest req) {
+        // 1. Rotate the refresh token (validates expiry and single-use)
+        RotatedToken rotated = refreshTokenService.rotateRefreshToken(req.refreshToken());
+
+        // 2. Fetch fresh user details to check real-time status
+        UserResponse user = userService.getUserById(rotated.userId());
+
+        // 3. Ensure account hasn't been BLOCKED or REJECTED
+        if (user.status() == AccountStatus.BLOCKED || user.status() == AccountStatus.REJECTED) {
+            refreshTokenService.revokeAllForUser(user.id());
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account is " + user.status() + ".");
+        }
+
+        // 4. Generate new JWT Access Token
+        String newAccessToken = jwtService.generateToken(
+                user.id().toString(),
+                user.email(),
+                user.role().name(),
+                user.status().name(),
+                Collections.emptySet()
+        );
+
+        int expiresIn = jwtService.getExpirationSeconds();
+
+        return new AuthResponse(newAccessToken, rotated.newRawToken(), "Bearer", expiresIn, user);
+    }
     public MessageResponse requestPasswordReset(ForgotPasswordRequest req) {
         try {
             // 1. Verify user exists and is active/eligible

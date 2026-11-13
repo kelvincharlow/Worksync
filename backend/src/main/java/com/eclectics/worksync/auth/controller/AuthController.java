@@ -16,6 +16,7 @@ import com.eclectics.worksync.users.dto.UserResponse;
 import com.eclectics.worksync.auth.service.RateLimiterService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.server.ResponseStatusException;
+import com.eclectics.worksync.auth.dto.RefreshTokenRequest;
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
@@ -44,6 +45,15 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         AuthResponse response = authService.login(request);
+        return ResponseEntity.ok(response);
+    }
+    /**
+     * Renew access token using a valid refresh token.
+     * Path: POST /api/v1/auth/refresh
+     */
+    @PostMapping("/refresh")
+    public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
+        AuthResponse response = authService.refresh(request);
         return ResponseEntity.ok(response);
     }
   @PostMapping("/forgot-password")
