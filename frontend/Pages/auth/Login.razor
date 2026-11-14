@@ -1,0 +1,148 @@
+@page "/login"
+@using Worksync.Frontend.Services
+@using Worksync.Frontend.Models.Auth
+
+@inject AuthApiService AuthApi
+@inject NavigationManager Navigation
+@inject AuthState Auth
+
+<div class="login-container">
+    <div class="login-card">
+        <div class="text-center mb-4">
+            <img src="/images/logo.png" alt="WorkSync Logo" class="brand-logo" />
+            <h2 class="mt-3 font-weight-bold">Welcome back</h2>
+            <p class="text-muted mb-0">Sign in to your WorkSync account</p>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_successMessage))
+        {
+            <div class="alert alert-success" role="alert">@_successMessage</div>
+        }
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <div class="alert alert-danger" role="alert">@_errorMessage</div>
+        }
+
+        <EditForm Model="@_loginModel" OnValidSubmit="HandleLogin">
+            <DataAnnotationsValidator />
+
+            <div class="form-group mb-3">
+                <label>Email</label>
+                <InputText type="email" class="form-control"
+                           @bind-Value="_loginModel.Email"
+                           placeholder="jane.doe@example.com"
+                           autocomplete="username" />
+                <ValidationMessage For="@(() => _loginModel.Email)" />
+            </div>
+
+            <div class="form-group mb-4">
+                <label>Password</label>
+                <InputText type="password" class="form-control"
+                           @bind-Value="_loginModel.Password"
+                           placeholder="••••••••"
+                           autocomplete="current-password" />
+                <ValidationMessage For="@(() => _loginModel.Password)" />
+                <div style="text-align:right; margin-top:8px;">
+                    <a href="/forgot-password"
+                       style="font-size:0.85rem; font-weight:500; color:#6366F1; text-decoration:none;">
+                        Forgot password?
+                    </a>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block w-100 py-2" disabled="@_isLoading">
+                @if (_isLoading)
+                {
+                    <span class="spinner-border spinner-border-sm mr-2" role="status" aria-hidden="true"></span>
+                    <span>Signing in...</span>
+                }
+                else
+                {
+                    <span>Sign in</span>
+                }
+            </button>
+        </EditForm>
+
+        <div class="text-center mt-3">
+            <p class="text-muted">Don't have an account? <a href="/register">Create one.</a></p>
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "registered")]
+    public bool? Registered { get; set; }
+
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? ReturnUrl { get; set; }
+
+    [SupplyParameterFromQuery(Name = "passwordReset")]
+    public bool? PasswordReset { get; set; }
+
+    private LoginRequest _loginModel = new();
+    private bool _isLoading;
+    private string? _errorMessage;
+    private string? _successMessage;
+
+    protected override void OnInitialized()
+    {
+        if (Registered == true)
+            _successMessage = "Account created. An administrator must approve it before you can access the workspace.";
+        if (PasswordReset == true)
+            _successMessage = "Password has been successfully reset. You can now log in with your new password.";
+    }
+
+    private async Task HandleLogin()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        var result = await AuthApi.LoginAsync(_loginModel);
+
+        if (!result.IsSuccess || result.Data is null)
+        {
+            _errorMessage = result.ErrorMessage ?? "Sign-in failed. Please try again.";
+            _isLoading = false;
+            return;
+        }
+
+        var auth = result.Data;
+        if (string.IsNullOrEmpty(auth.AccessToken))
+        {
+            _errorMessage = "Unexpected response from the server. Please try again.";
+            _isLoading = false;
+            return;
+        }
+
+        Auth.SetSession(auth.AccessToken, auth.ExpiresIn, auth.User);
+
+        switch (auth.User?.Status)
+        {
+            case "PENDING_APPROVAL":
+                Navigation.NavigateTo("/pending-approval");
+                break;
+            case "ACTIVE":
+                Navigation.NavigateTo(SafeReturnUrl() ?? "/dashboard");
+                break;
+            default:
+                Auth.Clear();
+                _errorMessage = auth.User?.Status == "BLOCKED"
+                    ? "Your account has been blocked. Contact your administrator."
+                    : "Your account was not approved. Contact your administrator.";
+                break;
+        }
+
+        _isLoading = false;
+    }
+
+    private string? SafeReturnUrl()
+    {
+        if (string.IsNullOrWhiteSpace(ReturnUrl)) return null;
+        if (ReturnUrl.StartsWith('/') &&
+            !ReturnUrl.StartsWith("//") &&
+            !ReturnUrl.StartsWith("/\\"))
+            return ReturnUrl;
+        return null;
+    }
+}

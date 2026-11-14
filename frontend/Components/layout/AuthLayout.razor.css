@@ -1,0 +1,55 @@
+.auth-layout {
+    min-height: 100vh;
+    background: #F8FAFC;
+    display: flex;
+    flex-direction: column;
+    font-family: 'Roboto', system-ui, -apple-system, sans-serif;
+}
+
+.auth-header {
+    background: #FFFFFF;
+    border-bottom: 1px solid #E2E8F0;
+    padding: 16px 32px;
+}
+
+.auth-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    color: #0F172A;
+}
+
+.auth-brand-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: #6366F1;
+}
+
+.auth-brand-icon svg {
+    width: 18px;
+    height: 18px;
+}
+
+.auth-brand-text {
+    font-weight: 700;
+    font-size: 1.05rem;
+    letter-spacing: -0.01em;
+}
+
+.auth-main {
+    flex: 1;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 80px 20px 40px;
+}
+
+@media (max-width: 600px) {
+    .auth-header { padding: 12px 20px; }
+    .auth-main { padding: 40px 16px 24px; }
+}
