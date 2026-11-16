@@ -1,6 +1,7 @@
 package com.eclectics.worksync.users.controller;
 
 import com.eclectics.worksync.auth.security.WorkSyncPrincipal;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import com.eclectics.worksync.users.dto.UpdateProfileRequest;
 import com.eclectics.worksync.users.dto.UserResponse;
 import com.eclectics.worksync.users.service.UserService;
@@ -17,6 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 /** Auth's filter/security chain supplies the verified identity and allowed account states. */
 @RestController
+@SecurityRequirement(name = "bearerAuth")
 @RequestMapping("/api/v1/users/me")
 public class UserController {
     private final UserService userService;
