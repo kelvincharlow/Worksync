@@ -888,12 +888,16 @@ components:
 
     AuthResponse:
       type: object
-      required: [accessToken, tokenType, expiresIn, user]
+      required: [accessToken, refreshToken, tokenType, expiresIn, user]
       properties:
         accessToken:
           type: string
           description: Signed JWT access token.
-          example: 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...'
+          example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+        refreshToken:
+          type: string
+          description: Opaque, single-use refresh token.
+          example: 'x8K2L_9aP0...'
         tokenType:
           type: string
           enum: [Bearer]
@@ -906,6 +910,16 @@ components:
           example: 900
         user:
           $ref: '#/components/schemas/UserRecord'
+
+    RefreshTokenRequest:
+      type: object
+      additionalProperties: false
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+          description: The single-use refresh token string.
+          example: 'x8K2L_9aP0...'
 
     PagedUsers:
       type: object
