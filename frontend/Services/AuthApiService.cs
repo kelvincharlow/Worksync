@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Microsoft.Extensions.Logging;
 using Worksync.Frontend.Models.Auth;
 using Worksync.Frontend.Models.Shared;
+using System.Net.Http.Headers;
 
 namespace Worksync.Frontend.Services;
 
@@ -10,12 +11,17 @@ public class AuthApiService
 {
     private readonly HttpClient _http;
     private readonly ILogger<AuthApiService> _logger;
+    private readonly AuthState _authState;
 
-    public AuthApiService(HttpClient http, ILogger<AuthApiService> logger)
+    public AuthApiService(
+        HttpClient http,
+        ILogger<AuthApiService> logger,
+        AuthState authState)
     {
         _http = http;
         _logger = logger;
-    }
+        _authState = authState;
+}
 
     // ─────────────────────────────────────────────────────────────
     // Public endpoints
@@ -40,26 +46,44 @@ public class AuthApiService
     // ─────────────────────────────────────────────────────────────
 
     public async Task<ApiResult> LogoutAsync()
+{
+    try
     {
-        try
+        if (string.IsNullOrWhiteSpace(_authState.AccessToken))
         {
-            var response = await _http.PostAsync("auth/logout", content: null);
-
-            if (response.IsSuccessStatusCode)
-                return ApiResult.Ok((int)response.StatusCode);
-
-            var apiError = await TryReadApiErrorAsync(response);
-            return ApiResult.Fail(
-                apiError?.Message ?? "Logout failed on the server.",
-                (int)response.StatusCode);
+            return ApiResult.Fail("No active access token was found.");
         }
-        catch (Exception ex)
+
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            "auth/logout");
+
+        request.Headers.Authorization =
+            new AuthenticationHeaderValue(
+                "Bearer",
+                _authState.AccessToken);
+
+        using var response = await _http.SendAsync(request);
+
+        if (response.IsSuccessStatusCode)
         {
-            _logger.LogWarning(ex, "Logout request failed");
-            // Even if the server call fails, the caller will still clear local state.
-            return ApiResult.Fail("Could not reach the server. Session cleared locally.");
+            return ApiResult.Ok((int)response.StatusCode);
         }
+
+        var apiError = await TryReadApiErrorAsync(response);
+
+        return ApiResult.Fail(
+            apiError?.Message ?? "Logout failed. Please try again.",
+            (int)response.StatusCode);
     }
+    catch (Exception ex)
+    {
+        _logger.LogWarning(ex, "Logout request failed");
+
+        return ApiResult.Fail(
+            "Could not reach the server. Your local session will be cleared.");
+    }
+}
 
     // ─────────────────────────────────────────────────────────────
     // Shared POST plumbing
@@ -69,8 +93,8 @@ public class AuthApiService
     {
         try
         {
-            var response = await _http.PostAsJsonAsync(path, payload);
-            return await ToResultAsync<T>(response, path);
+            using var response = await _http.PostAsJsonAsync(path, payload);
+                return await ToResultAsync<T>(response, path);
         }
         catch (HttpRequestException ex)
         {
@@ -89,32 +113,50 @@ public class AuthApiService
         }
     }
 
-    private async Task<ApiResult<T>> ToResultAsync<T>(HttpResponseMessage response, string path)
+    private async Task<ApiResult<T>> ToResultAsync<T>(
+    HttpResponseMessage response,
+    string path)
+{
+    if (response.IsSuccessStatusCode)
     {
-        if (response.IsSuccessStatusCode)
+        // Handle successful responses with no content.
+        if (response.StatusCode == HttpStatusCode.NoContent)
         {
-            T? data;
-            try
-            {
-                data = await response.Content.ReadFromJsonAsync<T>();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Malformed JSON response from {Path}", path);
-                return ApiResult<T>.Fail("The server returned an unexpected response.");
-            }
-
-            if (data is null)
-                return ApiResult<T>.Fail("The server returned an empty response.");
-
-            return ApiResult<T>.Ok(data, (int)response.StatusCode);
+            return ApiResult<T>.Ok(default!, (int)response.StatusCode);
         }
 
-        var apiError = await TryReadApiErrorAsync(response);
-        var message = apiError?.Message ?? DefaultMessageFor(response.StatusCode);
-        return ApiResult<T>.Fail(message, (int)response.StatusCode);
+        T? data;
+
+        try
+        {
+            data = await response.Content.ReadFromJsonAsync<T>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Malformed JSON response from {Path}", path);
+
+            return ApiResult<T>.Fail(
+                "The server returned an unexpected response.",
+                (int)response.StatusCode);
+        }
+
+        if (data is null)
+        {
+            return ApiResult<T>.Fail(
+                "The server returned an empty response.",
+                (int)response.StatusCode);
+        }
+
+        return ApiResult<T>.Ok(data, (int)response.StatusCode);
     }
 
+    var apiError = await TryReadApiErrorAsync(response);
+
+    var message = apiError?.Message ??
+                  DefaultMessageFor(response.StatusCode);
+
+    return ApiResult<T>.Fail(message, (int)response.StatusCode);
+}
     private static async Task<ApiError?> TryReadApiErrorAsync(HttpResponseMessage response)
     {
         try
