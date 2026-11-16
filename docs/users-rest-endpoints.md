@@ -1,8 +1,9 @@
-# Users REST endpoints — Step 5B Part 1
+# Users REST endpoints — Step 5B Parts 1 and 2
 
-These four routes are implemented on `feature/users-rest-endpoints`.
+The profile/read routes and three lifecycle routes below are implemented on
+`feature/users-admin-actions`.
 Auth registration, login and password-reset endpoints are implemented in main,
-not by Users Step 5B. This Users branch was created before that merge.
+not by Users Step 5B. The merged Auth and Notifications email modules are integrated.
 These routes reuse Auth's SecurityConfig, JwtFilter and WorkSyncPrincipal.
 Identity comes from the validated JWT subject; role and account status are reloaded
 through UserService on every request. Controllers never access UserRepository.
@@ -13,6 +14,9 @@ through UserService on every request. Controllers never access UserRepository.
 | PUT /api/v1/users/me | ACTIVE or PENDING_APPROVAL | Updated own UserResponse |
 | GET /api/v1/admin/users | ACTIVE ADMIN | UserPageResponse |
 | GET /api/v1/admin/users/{userId} | ACTIVE ADMIN | Target UserResponse or 404 |
+| PATCH /api/v1/admin/users/{userId}/approve | ACTIVE ADMIN | PENDING_APPROVAL → ACTIVE |
+| PATCH /api/v1/admin/users/{userId}/reject | ACTIVE ADMIN | PENDING_APPROVAL → REJECTED |
+| PATCH /api/v1/admin/users/{userId}/status | ACTIVE ADMIN | ACTIVE ↔ BLOCKED |
 
 PUT requires firstName and lastName (nonblank, at most 80 characters), plus
 phoneNumber in E.164 format. All other JSON properties are rejected with 400,
@@ -39,14 +43,36 @@ Updated main SecurityConfig permits PENDING_APPROVAL accounts to GET and PUT
 pending accounts cannot access notifications, including account-related ones.
 Administrator routes require both ROLE_ADMIN and STATUS_ACTIVE.
 
-This branch's local SecurityConfig still has the earlier pending-notification
-rule. Its Auth email dependency and shared configuration also predate main's
-updates. These docs record the updated main requirements; no code or branch
-integration is performed in this documentation step.
-
 Users-specific validation and missing-user errors use safe code/message/timestamp
-JSON with 400 and 404 respectively. Auth retains its existing 401/403 handling;
+JSON with 400 and 404 respectively. Invalid lifecycle transitions and protected
+administrator operations use the same safe envelope with 409. Auth retains its existing 401/403 handling;
 those responses are not promised to use the Users JSON error envelope.
+
+## Administrator account safety
+
+Actor UUID comes only from WorkSyncPrincipal. Actor-aware service overloads recheck
+ACTIVE ADMIN under the database transaction lock, so an actor disabled while waiting
+cannot continue an administrator action. Administrators cannot block themselves.
+The trusted one-argument blockUser method also protects the last ACTIVE ADMIN.
+
+All Users updates share PostgreSQL transaction advisory lock (1465075027, 1);
+the last-admin count and write are serialized across application instances through
+commit/rollback. Managed entities are refreshed under the lock to avoid stale
+profile/password writes restoring old statuses. READ_COMMITTED is required;
+higher-isolation outer transactions fail closed. No new table or migration is needed.
+Future write/role-management paths must use this protocol; direct SQL bypasses it.
+The tradeoff is serialization of Users writes; reads remain unlocked.
+
+Reject accepts no body, an empty object, or optional reason (at most 500 characters).
+Status requires status ACTIVE or BLOCKED and accepts the same optional reason.
+Unknown JSON properties are rejected. Reasons are not persisted, logged or delivered.
+No audit trail, role change or notification creation is implemented.
+
+Invalid transitions, self-blocking and last-admin protection return 409.
+Current authorization failure returns 403; unauthenticated access returns 401.
+Missing target UUID returns 404 and malformed UUID/JSON/request fields return 400.
+Auth continues to reload database authorities on subsequent JWT requests, so
+blocking immediately prevents further protected access with existing tokens.
 
 ## Automated test setup
 
@@ -71,17 +97,34 @@ automated tests. Set `spring.mail.test-connection=false` to prevent startup
 connection checks; this setting alone does not prevent sends, so mocks remain
 required. Do not opt into manual live-email tests during normal verification.
 
-The earlier 129-test result was obtained with this branch's older Auth setup; it
-does not verify updated main's required email dependency or included email
-profile. Review test mocks when integrating those changes. No tests are changed
-or rerun in this documentation-only step.
+PostgreSQL integration tests exercise competing administrator blocks, service-level
+guards, entity refresh and committed HTTP transitions. Existing profile, Auth,
+password-reset and mocked-email regression tests are retained.
 
 Auth's token validation checks signature, issuer and expiration; it currently
 does not require an audience. Token lifecycle, CORS and other Auth policy remain
 the Auth owner's responsibility. No Auth production code is changed here.
-Approval/rejection/blocking, role/permission management, and in-app notification
-endpoints remain planned and outside this step.
+Role/permission management and in-app notification endpoints remain planned and
+outside this step.
 
 Auth's password-reset paths differ from the draft OpenAPI; see the
 [Auth-owned path mismatch](api-contract.md#auth-owned-password-reset-path-mismatch).
-Neither Auth code nor its endpoint contracts are changed by this review.
+Neither Auth production code nor its password-reset routes are changed by this step.
+
+
+## Swagger UI JWT authorization
+
+Open `/swagger-ui/index.html` (or `/swagger-ui.html`) on the running backend.
+Use Auth's public login endpoint to obtain an accessToken. Click **Authorize**,
+select `bearerAuth`, and paste the token value without the `Bearer ` prefix.
+Swagger UI adds the Authorization header when using **Try it out** on Users routes.
+
+`UsersOpenApiConfig` declares an HTTP bearer scheme with JWT format. Both Users
+controllers apply it to their operations. No global security requirement is set,
+so public Auth operations remain documented without authentication. The generated
+`/v3/api-docs` is the source used by Swagger UI; `docs/openapi.yaml` remains the
+separate reviewed draft contract.
+
+These annotations describe authentication only. Existing SecurityConfig, JwtFilter,
+principal checks and UserService lifecycle guards enforce all actual access,
+including ACTIVE ADMIN, self-blocking and last-admin restrictions.

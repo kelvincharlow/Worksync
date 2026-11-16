@@ -25,6 +25,7 @@ import com.eclectics.worksync.auth.dto.RefreshTokenRequest;
 import com.eclectics.worksync.auth.service.RefreshTokenService.RotatedToken;
 import io.jsonwebtoken.Claims;
 import java.util.UUID;
+import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AuthService {
 
@@ -183,12 +184,14 @@ public class AuthService {
         return new MessageResponse("If the account is eligible, password-reset instructions will be sent.");
     }
 
-    /**
-     * Validates reset code, updates password, and sends best-effort confirmation.
+ /**
+     * Validates reset code, updates password in database, and consumes code atomically.
      */
+    @Transactional
     public MessageResponse confirmPasswordReset(ResetPasswordConfirmRequest req) {
-        // 1. Validate the code without consuming it yet
-        boolean isValid = passwordResetTokenService.validateCode(req.email(), req.resetCode());
+        // 1. Atomically validate and consume code
+        // (If userService.resetPassword fails below, @Transactional rolls back consumption!)
+        boolean isValid = passwordResetTokenService.validateAndConsume(req.email(), req.resetCode());
         if (!isValid) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid or expired reset code.");
         }
@@ -203,14 +206,19 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found.");
         }
 
-        // 4. Invalidate/consume the code only after DB update succeeds
-        passwordResetTokenService.consumeCode(req.email());
+        // 4. Revoke existing active refresh tokens so old sessions cannot be used
+        try {
+            UserResponse user = userService.getUserByEmail(req.email());
+            refreshTokenService.revokeAllForUser(user.id());
+        } catch (Exception ex) {
+            log.warn("Could not revoke refresh tokens on password reset: {}", ex.getMessage());
+        }
 
         // 5. Best-effort confirmation email: failure does not rollback password update
         try {
             emailNotificationService.sendPasswordChangedConfirmation(req.email());
         } catch (Exception ex) {
-            log.error("Failed to send password-change confirmation email to recipient: {}", ex.getMessage());
+            log.warn("Failed to send password-change confirmation email: {}", ex.getMessage());
         }
 
         return new MessageResponse("Password has been successfully reset. You can now log in with your new password.");

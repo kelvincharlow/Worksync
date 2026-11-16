@@ -2,6 +2,7 @@ package com.eclectics.worksync.users.repository;
 
 import com.eclectics.worksync.users.entity.AccountStatus;
 import com.eclectics.worksync.users.entity.User;
+import com.eclectics.worksync.users.entity.SystemRole;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -18,6 +19,13 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     @Query("select (count(u) > 0) from User u where lower(u.email) = lower(trim(:email))")
     boolean existsByEmail(@Param("email") String email);
+
+    // PostgreSQL transaction lock: shared by every Users update, released only at commit/rollback.
+    // The two integers reserve the WorkSync Users lifecycle lock namespace.
+    @Query(value = "SELECT 1 FROM pg_advisory_xact_lock(1465075027, 1)", nativeQuery = true)
+    int lockAccountLifecycle();
+
+    long countByRoleAndStatus(SystemRole role, AccountStatus status);
 
     Page<User> findByStatus(AccountStatus status, Pageable pageable);
 }

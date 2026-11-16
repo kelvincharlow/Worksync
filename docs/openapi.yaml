@@ -4,10 +4,11 @@ info:
   version: 0.2.0
   description: |
     Proposed, contract-first API for the initial Authentication, Users, and
-    Notifications milestone. Users Step 5B implements GET/PUT /users/me and
-    GET /admin/users and /admin/users/{userId} on feature/users-rest-endpoints.
+    Notifications milestone. Users Step 5B Part 1 implements GET/PUT /users/me and
+    GET /admin/users and /admin/users/{userId}. Part 2 implements PATCH
+    /admin/users/{userId}/approve, /reject and /status on feature/users-admin-actions.
     Auth registration, login and password-reset endpoints are implemented in main,
-    not by Users Step 5B. This Users branch predates that merge.
+    not by Users Step 5B. Auth and Notifications email code are integrated.
     Other Users/Notifications operations remain planned.
     Auth-owned operation definitions below remain draft contracts; see
     docs/api-contract.md for the existing password-reset path mismatch.
@@ -17,12 +18,12 @@ info:
     - JWT Bearer access tokens (not cookie-based sessions).
     - Public self-registration with first name, last name, email, phone number,
       and password. Accounts begin as PENDING_APPROVAL with system role USER.
-    - Administrator approval/rejection endpoints and organization-level
-      permission grants such as PROJECT_CREATE remain planned.
+    - Administrator approval/rejection/block/unblock endpoints are implemented.
+      Organization-level permission grants such as PROJECT_CREATE remain planned.
     - Updated main SecurityConfig allows PENDING_APPROVAL users to GET and PUT
       /users/me. /api/v1/notifications/** requires STATUS_ACTIVE; pending users
       cannot access notifications. Administrator routes require ROLE_ADMIN and
-      STATUS_ACTIVE. This branch still has the older notification access rule.
+      STATUS_ACTIVE.
     - ADMIN is a system-level role; project Manager/Member/Viewer roles will be
       implemented later as project-specific memberships.
     - Future additional permissions are planned as strings, not boolean flags.
@@ -31,8 +32,7 @@ info:
     - Updated main Auth requires EmailNotificationService, and shared configuration
       includes the email profile. Tests must mock email delivery and never use live
       SMTP. Do not rely on an absent email profile to prevent delivery.
-    - This branch predates those Auth configuration changes; see the Users test
-      setup in docs/users-rest-endpoints.md. No Auth code changes are made here.
+    - See docs/users-rest-endpoints.md for the mocked-transport test setup.
 
     Security and production notes:
     - Bootstrap the first administrator through a secure, one-time setup;
@@ -369,22 +369,29 @@ paths:
     patch:
       tags: [Administration]
       x-required-role: ADMIN
-      x-implementation-status: planned
+      x-implementation-status: implemented-users-step-5b-part-2
       operationId: approveUser
       summary: Approve a pending registration
       description: |
-        ADMIN only. Permitted transition: PENDING_APPROVAL -> ACTIVE.
+        ACTIVE ADMIN only. Permitted transition: PENDING_APPROVAL -> ACTIVE.
         Does not automatically grant PROJECT_CREATE or any project membership.
-        May create account approval notifications for the user.
+        No notification or permission grant is created.
       parameters:
-        - $ref: '#/components/parameters/UserId'
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
       responses:
         '200':
           description: Account approved.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserRecord'
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -392,20 +399,30 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          $ref: '#/components/responses/InvalidStatusTransition'
+          description: Invalid account transition or protected administrator operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
 
   /admin/users/{userId}/reject:
     patch:
       tags: [Administration]
       x-required-role: ADMIN
-      x-implementation-status: planned
+      x-implementation-status: implemented-users-step-5b-part-2
       operationId: rejectUser
       summary: Reject a pending registration
       description: |
-        ADMIN only. Permitted transition: PENDING_APPROVAL -> REJECTED.
-        Rejected accounts are denied login. Rejection can notify the applicant.
+        ACTIVE ADMIN only. Permitted transition: PENDING_APPROVAL -> REJECTED.
+        Rejected accounts are denied login. Optional reason is validated only;
+        it is not persisted, logged or delivered. Unknown JSON fields are rejected.
       parameters:
-        - $ref: '#/components/parameters/UserId'
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
       requestBody:
         required: false
         content:
@@ -418,7 +435,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserRecord'
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -426,22 +445,34 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          $ref: '#/components/responses/InvalidStatusTransition'
+          description: Invalid account transition or protected administrator operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
 
   /admin/users/{userId}/status:
     patch:
       tags: [Administration]
       x-required-role: ADMIN
-      x-implementation-status: planned
+      x-implementation-status: implemented-users-step-5b-part-2
       operationId: changeUserBlockStatus
       summary: Block or unblock an existing active account
       description: |
-        ADMIN only. Supported transitions: ACTIVE -> BLOCKED and
+        ACTIVE ADMIN only. Supported transitions: ACTIVE -> BLOCKED and
         BLOCKED -> ACTIVE. This endpoint is not a shortcut for approving
-        PENDING_APPROVAL or REJECTED users. Prevent self-lockout and maintain
-        audit logs for security-sensitive changes.
+        PENDING_APPROVAL or REJECTED users. Prevent self-blocking and protect
+        the last ACTIVE ADMIN using a transaction-level PostgreSQL lock.
+        Actor identity comes from WorkSyncPrincipal and is rechecked in the service.
+        Optional reason is validated only, not persisted, logged or delivered.
+        No audit trail is implemented in this step.
       parameters:
-        - $ref: '#/components/parameters/UserId'
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
       requestBody:
         required: true
         content:
@@ -454,7 +485,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserRecord'
+                $ref: '#/components/schemas/UserResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -464,7 +495,11 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          $ref: '#/components/responses/InvalidStatusTransition'
+          description: Invalid account transition or protected administrator operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
 
   /admin/users/{userId}/permissions:
     patch:
@@ -853,12 +888,16 @@ components:
 
     AuthResponse:
       type: object
-      required: [accessToken, tokenType, expiresIn, user]
+      required: [accessToken, refreshToken, tokenType, expiresIn, user]
       properties:
         accessToken:
           type: string
           description: Signed JWT access token.
-          example: 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...'
+          example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+        refreshToken:
+          type: string
+          description: Opaque, single-use refresh token.
+          example: 'x8K2L_9aP0...'
         tokenType:
           type: string
           enum: [Bearer]
@@ -871,6 +910,16 @@ components:
           example: 900
         user:
           $ref: '#/components/schemas/UserRecord'
+
+    RefreshTokenRequest:
+      type: object
+      additionalProperties: false
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+          description: The single-use refresh token string.
+          example: 'x8K2L_9aP0...'
 
     PagedUsers:
       type: object

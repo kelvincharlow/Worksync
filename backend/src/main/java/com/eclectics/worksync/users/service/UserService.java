@@ -6,9 +6,13 @@ import com.eclectics.worksync.users.dto.UpdateProfileRequest;
 import com.eclectics.worksync.users.dto.UserResponse;
 import com.eclectics.worksync.users.entity.AccountStatus;
 import com.eclectics.worksync.users.entity.User;
+import com.eclectics.worksync.users.entity.SystemRole;
+import com.eclectics.worksync.users.exception.AdministratorAccessDeniedException;
+import com.eclectics.worksync.users.exception.ProtectedAdministratorOperationException;
 import com.eclectics.worksync.users.exception.DuplicateEmailException;
 import com.eclectics.worksync.users.exception.UserNotFoundException;
 import com.eclectics.worksync.users.repository.UserRepository;
+import jakarta.persistence.EntityManager;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validator;
 import java.util.Locale;
@@ -18,23 +22,28 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import java.sql.Connection;
 
 /**
  * Shared Java boundary for Users operations inside the monolith.
  * Auth and future controllers inject this Spring bean rather than accessing UserRepository.
  * UserResponse contains safe account data; AuthUserDetails is credential-bearing and internal only.
  * Callers must enforce current-user/admin authorization;
- * the status-changing methods below do not authenticate or authorize their caller.
+ * actor-aware administrator methods also recheck current database authorization under the lifecycle lock.
  */
 @Service
 @Transactional(readOnly = true)
 public class UserService {
     private final UserRepository repository;
     private final Validator validator;
+    private final EntityManager entityManager;
 
-    public UserService(UserRepository repository, Validator validator) {
+    public UserService(UserRepository repository, Validator validator, EntityManager entityManager) {
         this.repository = repository;
         this.validator = validator;
+        this.entityManager = entityManager;
     }
 
     /**
@@ -42,7 +51,7 @@ public class UserService {
      * The hash is already encoded by Auth; normalization applies only to email.
      * Validation happens here too because Java callers bypass HTTP request validation.
      */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public UserResponse createPendingUser(CreateUserCommand command) {
         Objects.requireNonNull(command, "command is required");
         var normalized = new CreateUserCommand(
@@ -97,7 +106,7 @@ public class UserService {
      * Does not verify reset codes, decide reset eligibility, hash passwords or invalidate tokens.
      * Never log arguments or expose this method through an unauthenticated controller.
      */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public void resetPassword(String email, String newPasswordHash) {
         String normalized = normalizeEmail(email);
         var emailViolations = validator.validateValue(CreateUserCommand.class, "email", normalized);
@@ -108,7 +117,9 @@ public class UserService {
         if (!hashViolations.isEmpty()) {
             throw new ConstraintViolationException(hashViolations);
         }
+        lockAccountLifecycle();
         User user = repository.findByEmail(normalized).orElseThrow(UserNotFoundException::new);
+        entityManager.refresh(user);
         user.changePasswordHash(newPasswordHash);
         repository.saveAndFlush(user);
     }
@@ -117,11 +128,12 @@ public class UserService {
      * Replaces basic profile fields only. The caller must authorize access to userId.
      * Email, credentials, role and account status cannot be changed by this request.
      */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public UserResponse updateProfile(UUID userId, UpdateProfileRequest request) {
         Objects.requireNonNull(request, "request is required");
         validate(request);
-        User user = requireUser(userId);
+        lockAccountLifecycle();
+        User user = requireLifecycleUser(userId);
         user.setFirstName(request.firstName());
         user.setLastName(request.lastName());
         user.setPhoneNumber(request.phoneNumber());
@@ -129,38 +141,100 @@ public class UserService {
         return UserResponse.from(repository.saveAndFlush(user));
     }
 
-    // Internal administrator operations only. Method names do not enforce authorization.
-    // The future secured AdminUserController must authorize administrators before calling these.
+    // Trusted internal one-argument methods retain existing lifecycle behavior.
+    // HTTP workflows use actor-aware overloads and Auth's existing secured route chain.
+    // Every update uses the same transaction lock, preventing stale profile/password writes
+    // from overwriting a concurrently changed role/status in Hibernate's full-row updates.
     /** Approves a pending registration; repeated approval is an invalid transition. */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public UserResponse approveUser(UUID userId) {
-        User user = requireUser(userId);
+        lockAccountLifecycle();
+        User user = requireLifecycleUser(userId);
         user.approve();
         return UserResponse.from(repository.saveAndFlush(user));
     }
 
     /** Rejects a pending registration without changing its role or credentials. */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public UserResponse rejectUser(UUID userId) {
-        User user = requireUser(userId);
+        lockAccountLifecycle();
+        User user = requireLifecycleUser(userId);
         user.reject();
         return UserResponse.from(repository.saveAndFlush(user));
     }
 
     /** Blocks an active account; this cannot be used to reject a pending registration. */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public UserResponse blockUser(UUID userId) {
-        User user = requireUser(userId);
+        lockAccountLifecycle();
+        User user = requireLifecycleUser(userId);
+        if (user.getStatus() == AccountStatus.ACTIVE && user.getRole() == SystemRole.ADMIN
+                && repository.countByRoleAndStatus(SystemRole.ADMIN, AccountStatus.ACTIVE) <= 1) {
+            throw new ProtectedAdministratorOperationException();
+        }
         user.block();
         return UserResponse.from(repository.saveAndFlush(user));
     }
 
     /** Restores a blocked account to ACTIVE; this cannot approve pending/rejected users. */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public UserResponse unblockUser(UUID userId) {
-        User user = requireUser(userId);
+        lockAccountLifecycle();
+        User user = requireLifecycleUser(userId);
         user.unblock();
         return UserResponse.from(repository.saveAndFlush(user));
+    }
+
+    /** Auth's principal supplies actorId; recheck authorization after acquiring the shared lock. */
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public UserResponse approveUser(UUID actorId, UUID userId) {
+        requireActiveAdministrator(actorId);
+        return approveUser(userId);
+    }
+
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public UserResponse rejectUser(UUID actorId, UUID userId) {
+        requireActiveAdministrator(actorId);
+        return rejectUser(userId);
+    }
+
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public UserResponse blockUser(UUID actorId, UUID userId) {
+        requireActiveAdministrator(actorId);
+        if (actorId.equals(userId)) {
+            throw new ProtectedAdministratorOperationException();
+        }
+        return blockUser(userId);
+    }
+
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public UserResponse unblockUser(UUID actorId, UUID userId) {
+        requireActiveAdministrator(actorId);
+        return unblockUser(userId);
+    }
+
+    private void lockAccountLifecycle() {
+        // Joining an outer snapshot transaction could make the count stale even after locking.
+        Integer isolation = TransactionSynchronizationManager.getCurrentTransactionIsolationLevel();
+        if (isolation != null && isolation != Connection.TRANSACTION_READ_COMMITTED) {
+            throw new ProtectedAdministratorOperationException();
+        }
+        repository.lockAccountLifecycle();
+    }
+
+    private User requireLifecycleUser(UUID userId) {
+        User user = requireUser(userId);
+        // Refresh cached entities if a trusted Java caller already loaded them in this transaction.
+        entityManager.refresh(user);
+        return user;
+    }
+
+    private void requireActiveAdministrator(UUID actorId) {
+        lockAccountLifecycle();
+        User actor = requireLifecycleUser(actorId);
+        if (actor.getRole() != SystemRole.ADMIN || actor.getStatus() != AccountStatus.ACTIVE) {
+            throw new AdministratorAccessDeniedException();
+        }
     }
 
     /**

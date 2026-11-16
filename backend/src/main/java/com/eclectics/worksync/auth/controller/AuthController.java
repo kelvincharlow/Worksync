@@ -73,31 +73,27 @@ public class AuthController {
         }
 
         authService.logout(authHeader, principal.userId());
-        return ResponseEntity.noContent().build(); // HTTP 204 No Content
-    }
+        return ResponseEntity.noContent().build(); }// HTTP 204 No Content
   @PostMapping("/forgot-password")
     public ResponseEntity<MessageResponse> forgotPassword(
             @Valid @RequestBody ForgotPasswordRequest request,
             HttpServletRequest servletRequest) {
 
-        // 1. Extract IP (supports proxies / cloud load balancers)
-        String clientIp = servletRequest.getHeader("X-Forwarded-For");
-        if (clientIp == null || clientIp.isBlank()) {
-            clientIp = servletRequest.getRemoteAddr();
-        } else {
-            clientIp = clientIp.split(",")[0].trim();
-        }
+        // 1. Rely on sanitized remote address (prevents X-Forwarded-For spoofing attacks)
+        String clientIp = servletRequest.getRemoteAddr();
 
-        // 2. Reject if this IP has flooded requests (returns 429 Too Many Requests)
-        if (!rateLimiterService.isIpAllowed(clientIp)) {
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Please try again later.");
+        // 2. Check rate limit
+        RateLimiterService.RateLimitResult rateCheck = rateLimiterService.checkIpRateLimit(clientIp);
+        if (!rateCheck.isAllowed()) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .header(HttpHeaders.RETRY_AFTER, String.valueOf(rateCheck.retryAfterSeconds()))
+                    .body(new MessageResponse("Too many requests. Please try again in " + rateCheck.retryAfterSeconds() + " seconds."));
         }
 
         // 3. Delegate to service
         MessageResponse response = authService.requestPasswordReset(request);
         return ResponseEntity.ok(response);
     }
-
     @PostMapping("/reset-password")
     public ResponseEntity<MessageResponse> resetPassword(@Valid @RequestBody ResetPasswordConfirmRequest request) {
         MessageResponse response = authService.confirmPasswordReset(request);

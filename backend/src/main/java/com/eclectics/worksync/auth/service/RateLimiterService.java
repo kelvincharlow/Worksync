@@ -3,6 +3,7 @@ package com.eclectics.worksync.auth.service;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -17,6 +18,8 @@ public class RateLimiterService {
     // Stores timestamps of recent requests per client IP
     private final Map<String, ConcurrentLinkedQueue<Instant>> ipRequestLog = new ConcurrentHashMap<>();
 
+    public record RateLimitResult(boolean isAllowed, long retryAfterSeconds) {}
+
     public RateLimiterService(
             @Value("${app.rate-limit.ip.max-requests:5}") int maxRequestsPerIp,
             @Value("${app.rate-limit.ip.window-seconds:900}") int windowSeconds) {
@@ -25,10 +28,10 @@ public class RateLimiterService {
     }
 
     /**
-     * Checks if the given IP address has exceeded the allowed request limit.
-     * Sliding-window algorithm.
+     * Checks if the IP is allowed under the sliding-window limit.
+     * If blocked, returns the exact seconds the caller must wait (Retry-After).
      */
-    public boolean isIpAllowed(String ipAddress) {
+    public synchronized RateLimitResult checkIpRateLimit(String ipAddress) {
         Instant now = Instant.now();
         Instant windowStart = now.minusSeconds(windowSeconds);
 
@@ -40,12 +43,17 @@ public class RateLimiterService {
             timestamps.poll();
         }
 
-        // Reject if exceeded limit
+        // If limit exceeded, calculate how many seconds until the oldest request leaves the window
         if (timestamps.size() >= maxRequestsPerIp) {
-            return false;
+            Instant oldest = timestamps.peek();
+            long retryAfter = oldest != null 
+                    ? Math.max(1, Duration.between(now, oldest.plusSeconds(windowSeconds)).getSeconds())
+                    : windowSeconds;
+            return new RateLimitResult(false, retryAfter);
         }
 
+        // Record this request
         timestamps.add(now);
-        return true;
+        return new RateLimitResult(true, 0);
     }
 }

@@ -2,6 +2,9 @@ package com.eclectics.worksync.users.controller;
 
 import com.eclectics.worksync.users.dto.UserErrorResponse;
 import com.eclectics.worksync.users.exception.UserNotFoundException;
+import com.eclectics.worksync.users.exception.InvalidAccountStatusTransitionException;
+import com.eclectics.worksync.users.exception.ProtectedAdministratorOperationException;
+import com.eclectics.worksync.users.exception.AdministratorAccessDeniedException;
 import jakarta.validation.ConstraintViolationException;
 import java.time.Instant;
 import org.springframework.http.HttpStatus;
@@ -20,6 +23,27 @@ public class UserExceptionHandler {
     public ResponseEntity<UserErrorResponse> notFound() {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new UserErrorResponse("USER_NOT_FOUND", "User not found", Instant.now()));
+    }
+
+    @ExceptionHandler(InvalidAccountStatusTransitionException.class)
+    public ResponseEntity<UserErrorResponse> invalidTransition() {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new UserErrorResponse("INVALID_ACCOUNT_STATUS_TRANSITION",
+                        "Operation is not valid for the account status", Instant.now()));
+    }
+
+    @ExceptionHandler(ProtectedAdministratorOperationException.class)
+    public ResponseEntity<UserErrorResponse> protectedAdministrator() {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new UserErrorResponse("PROTECTED_ADMINISTRATOR_OPERATION",
+                        "Administrator account operation is protected", Instant.now()));
+    }
+
+    @ExceptionHandler(AdministratorAccessDeniedException.class)
+    public ResponseEntity<UserErrorResponse> forbidden() {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new UserErrorResponse("ADMINISTRATOR_ACCESS_REQUIRED",
+                        "Administrator access is required", Instant.now()));
     }
 
     @ExceptionHandler({MethodArgumentNotValidException.class, HttpMessageNotReadableException.class,
