@@ -283,7 +283,9 @@ a:hover {
     margin-bottom: 8px;
 }
 
+/* Add or update inside .auth-shell .form-control in wwwroot/css/app.css */
 .auth-shell .form-control {
+    box-sizing: border-box;
     width: 100%;
     height: 52px;
     padding: 0 18px;
@@ -298,6 +300,21 @@ a:hover {
     -webkit-appearance: none;
 }
 
+.auth-shell .form-control.invalid {
+    border-color: #DC2626;
+}
+
+.password-match-message {
+    color: #166534;
+    font-size: 0.8rem;
+    margin-top: 6px;
+}
+
+.auth-inline-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 8px;
+}
 .auth-shell .form-control::placeholder {
     color: #94A3B8;
 }

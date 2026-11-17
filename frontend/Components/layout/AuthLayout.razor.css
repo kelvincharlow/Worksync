@@ -34,3 +34,61 @@
 .auth-main {
     min-height: calc(100vh - 80px);
 }
+.auth-layout {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background-color: #FFFFFF;
+}
+
+.auth-header {
+    padding: 20px 40px;
+    background-color: #FFFFFF;
+}
+
+.auth-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+}
+
+.auth-brand-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background-color: #1B2A4A;
+    border-radius: 10px;
+}
+
+.auth-brand-icon svg {
+    width: 24px;
+    height: 24px;
+}
+
+.auth-brand-text {
+    font-size: 22px;
+    font-weight: 700;
+    color: #1B2A4A;
+}
+
+.auth-main {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 20px 48px;
+}
+
+@media (max-width: 600px) {
+    .auth-header {
+        padding: 16px 20px;
+    }
+
+    .auth-main {
+        align-items: flex-start;
+        padding: 16px 16px 36px;
+    }
+}

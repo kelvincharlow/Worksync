@@ -1,0 +1,10 @@
+*   [33mc934260[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mfront-end-setup[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/front-end-setup[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m)[m Merge branch 'main' of https://github.com/kelvincharlow/Worksync
+[31m|[m[32m\[m  
+[31m|[m * [33m8b53e95[m fix(db): add password reset tokens migration
+[31m|[m * [33mc8e6b49[m updated open api yaml file
+[31m|[m * [33m2f6e5c9[m feat(auth): persist password reset tokens in postgresql with hmac-sha256
+[31m|[m * [33mcfaa0cc[m feat(auth): persist password reset tokens in postgresql with hmac-sha256
+[31m|[m * [33m1e0e3fd[m feat(auth): standardize api error contract with authexceptionhandler
+[31m|[m * [33m7ecc200[m feat(auth): harden rate limiter against ip spoofing and add retry-after
+[31m|[m *   [33m5a1637f[m Merge branch 'main' of https://github.com/kelvincharlow/Worksync
+[31m|[m [33m|[m[34m\[m  

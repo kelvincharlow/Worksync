@@ -10,5 +10,8 @@ public class UserRecord
     public string PhoneNumber { get; set; } = "";
     public string Role { get; set; } = "USER";
     public string Status { get; set; } = "PENDING_APPROVAL";
+    public DateTimeOffset? CreatedAt { get; set; }
+    public DateTimeOffset? UpdatedAt { get; set; }
     public List<string> Permissions { get; set; } = new();
+
 }
