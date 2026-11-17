@@ -1,0 +1,58 @@
+[33mc934260[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/front-end-setup[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mfront-end-setup[m[33m)[m Merge branch 'main' of https://github.com/kelvincharlow/Worksync
+[33m9dec163[m fix(auth): improve password reset form validation and flow
+[33m8b53e95[m fix(db): add password reset tokens migration
+[33mc8e6b49[m updated open api yaml file
+[33m2f6e5c9[m feat(auth): persist password reset tokens in postgresql with hmac-sha256
+[33mcfaa0cc[m feat(auth): persist password reset tokens in postgresql with hmac-sha256
+[33m1e0e3fd[m feat(auth): standardize api error contract with authexceptionhandler
+[33m7ecc200[m feat(auth): harden rate limiter against ip spoofing and add retry-after
+[33m5a1637f[m Merge branch 'main' of https://github.com/kelvincharlow/Worksync
+[33m9f61d8f[m feat(security): configure cors for frontend integration
+[33m45b9f66[m feat(auth): implement password reset flow with validation
+[33m37e7209[m Merge pull request #5 from kelvincharlow/feature/users-admin-actions
+[33m86f5549[m Merge branch 'front-end-setup'
+[33m5559361[m feat: implement password reset screens
+[33m4a91b39[m[33m ([m[1;31morigin/feature/users-admin-actions[m[33m)[m feat(users): implement secure admin actions and Swagger JWT support
+[33md8b6b05[m feat(auth): implement server-side logout and token revocation
+[33ma7d00c1[m feat(auth): implement refresh token rotation and session renewal
+[33me494e75[m feat(auth): implement 3-step password reset UI wizard
+[33m9a3ec95[m Merge pull request #4 from kelvincharlow/feature/users-rest-endpoints
+[33m9f314d4[m[33m ([m[1;31morigin/feature/users-rest-endpoints[m[33m)[m test(integration): verify auth users and notifications
+[33ma4869e2[m fix(build): remove duplicate mail dependency
+[33m60ed71e[m Merge origin/main into feature/users-rest-endpoints
+[33mc8169bc[m docs(users): align REST documentation with merged auth
+[33maa7099a[m Merge pull request #3 from kelvincharlow/feature/notifications-email
+[33m4fa3e9b[m feat(users): add secure profile and admin read endpoints
+[33m1c3eabe[m Merge branch 'feature/auth-module'
+[33mcf1e73e[m[33m ([m[1;31morigin/feature/auth-module[m[33m)[m chore(config): activate email profile and externalize jwt secret
+[33m380edd8[m feat(auth): enforce ip rate limiting and harden reset security
+[33m9748080[m refactor(auth): introduce AuthApiService for all auth HTTP calls
+[33m72f1f1a[m added reset password
+[33mf0c2b89[m feat(auth): secure password reset flow and enforce active admin authorization
+[33mfe7f7c9[m feat(auth): add password reset flow (forgot + reset pages)
+[33ma917ceb[m[33m ([m[1;31morigin/feature/notifications-email[m[33m)[m feat(notifications): implement SMTP email delivery for password reset
+[33m44d69f2[m Merge pull request #2 from kelvincharlow/feature/users-password-reset
+[33m57ff4b9[m[33m ([m[1;31morigin/feature/users-password-reset[m[33m)[m feat(users): add password reset persistence support
+[33m1123cda[m fix(styles): make scoped CSS valid and centralize form styling
+[33m9cc1ca0[m Added, login.razor and login.razor.css  and auth realated files
+[33m56f798e[m made a change
+[33m715fd6f[m feat(auth): add password reset token service and request/confirm workflows
+[33m7ce74b6[m feat(auth):integrate with users module
+[33mcbec730[m chore: sync with main and accept latest users service
+[33m8da8040[m put  Register.razor and  Register.razor  same folder
+[33m98c4ddb[m refactor(auth): reorganize classes into domain-driven subpackages
+[33m8007a0b[m was working on brand - logo but i have not resolved it
+[33m2daa748[m feat(auth): implement auth controller, service, and JWT security filter
+[33med09203[m managed to add the input styling for the input text
+[33ma248fe9[m  done with the registration form
+[33m25ea49d[m Merge PR #1: Implement Users module steps 1–4.5
+[33mc131d66[m[33m ([m[1;31morigin/feature/users[m[33m)[m feat(users): add trusted internal authentication lookup
+[33mb48697d[m feat(users): add transactional services and document Auth integration
+[33mc2091fc[m feat(users): add persistence, DTOs and account transition rules
+[33mca17e23[m feat(auth): add security configuration and JWT token service
+[33mcc3107d[m Set up MudBlazor and base theme (navy/indigo/white/light-grey palette)
+[33m95fab79[m  Set up MudBlazor and base theme (navy/indigo/white/light-grey palette)
+[33m47c0988[m setup madblazor and base  theme  (navy/indigo/white/light-grey palette)
+[33mc9ff6b3[m feat(auth): add security dependencies and request/response DTOs
+[33m20976d7[m Initialize Worksync project skeleton and collaboration docs
+[33mf64d247[m Initial commit
