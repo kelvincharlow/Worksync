@@ -1,0 +1,28 @@
+@namespace Worksync.Frontend.Components.Layout
+@inject NavigationManager Navigation
+
+<MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Class="pa-8">
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+    <MudText Typo="Typo.body2" Color="Color.Secondary">Redirecting to sign in…</MudText>
+</MudStack>
+
+@code {
+    protected override void OnInitialized()
+    {
+        var relative = Navigation.ToBaseRelativePath(Navigation.Uri);
+        var pathOnly = relative.Split('?', '#')[0].Trim('/').ToLowerInvariant();
+
+        if (pathOnly is "login" or "register" or "forgot-password" or "reset-password")
+            return;
+
+        var returnUrl = string.IsNullOrWhiteSpace(relative)
+            ? null
+            : "/" + relative.TrimStart('/');
+
+        var target = string.IsNullOrWhiteSpace(returnUrl)
+            ? "/login"
+            : $"/login?returnUrl={Uri.EscapeDataString(returnUrl)}";
+
+        Navigation.NavigateTo(target, replace: true);
+    }
+}

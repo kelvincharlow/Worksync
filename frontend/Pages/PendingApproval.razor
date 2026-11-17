@@ -1,0 +1,192 @@
+@page "/pending-approval"
+@attribute [Authorize]
+@using Worksync.Frontend.Models.Shared
+
+@inject AuthState Auth
+@inject AuthSessionService SessionService
+@inject UserApiService UserApi
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Approval Status · Worksync</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-4">
+    <MudPaper Elevation="2" Class="pa-6 pa-sm-8" Style="border-radius: 14px;">
+        <MudStack Spacing="4">
+            <div>
+                <h1 class="mud-typography mud-typography-h4 font-weight-bold mb-1">
+                    Account status
+                </h1>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    Signed in as <strong>@Auth.User?.Email</strong>
+                </MudText>
+            </div>
+
+            @if (CurrentStatus == "REJECTED")
+            {
+                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">
+                    <strong>Registration rejected.</strong> Your account request was not approved by an administrator.
+                    Contact your administrator if you believe this is an error.
+                </MudAlert>
+            }
+            else if (CurrentStatus == "BLOCKED")
+            {
+                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">
+                    <strong>Account blocked.</strong> Your access has been suspended. Please contact an administrator.
+                </MudAlert>
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                    <strong>Awaiting administrator approval.</strong> Your account is currently
+                    <strong>PENDING_APPROVAL</strong>. You can update your profile details while waiting,
+                    but workspace access will unlock once an administrator approves your account.
+                </MudAlert>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(_infoMessage))
+            {
+                <MudAlert Severity="Severity.Normal" Dense="true">@_infoMessage</MudAlert>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(_errorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Dense="true">@_errorMessage</MudAlert>
+            }
+
+            <MudDivider />
+
+            <MudStack Spacing="1">
+                <MudText Typo="Typo.body2">
+                    <strong>Name:</strong> @($"{Auth.User?.FirstName} {Auth.User?.LastName}".Trim())
+                </MudText>
+                <MudText Typo="Typo.body2">
+                    <strong>Role:</strong> @(Auth.User?.Role ?? "USER")
+                </MudText>
+                <MudText Typo="Typo.body2">
+                    <strong>Current status:</strong>
+                    <MudChip T="string"
+                             Size="Size.Small"
+                             Color="@StatusColor"
+                             Variant="Variant.Filled"
+                             Class="ml-1">
+                        @CurrentStatus
+                    </MudChip>
+                </MudText>
+            </MudStack>
+
+            <MudStack Row="true" Spacing="2" Class="flex-wrap pt-2">
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Refresh"
+                           Disabled="@(_isRefreshing || _isLoggingOut)"
+                           OnClick="RefreshStatusAsync">
+                    @(_isRefreshing ? "Checking status…" : "Refresh status")
+                </MudButton>
+
+                @if (CurrentStatus == "PENDING_APPROVAL")
+                {
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Person"
+                               Href="/profile"
+                               Disabled="@(_isRefreshing || _isLoggingOut)">
+                        My profile
+                    </MudButton>
+                }
+
+                <MudButton Variant="Variant.Text"
+                           Color="Color.Error"
+                           StartIcon="@Icons.Material.Filled.Logout"
+                           Disabled="@(_isRefreshing || _isLoggingOut)"
+                           OnClick="HandleLogoutAsync">
+                    @(_isLoggingOut ? "Signing out…" : "Sign out")
+                </MudButton>
+            </MudStack>
+        </MudStack>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private bool _isRefreshing;
+    private bool _isLoggingOut;
+    private string? _infoMessage;
+    private string? _errorMessage;
+
+    private string CurrentStatus => Auth.User?.Status ?? "PENDING_APPROVAL";
+
+    private Color StatusColor => CurrentStatus switch
+    {
+        "ACTIVE" => Color.Success,
+        "REJECTED" or "BLOCKED" => Color.Error,
+        _ => Color.Warning
+    };
+
+    protected override void OnInitialized()
+    {
+        if (Auth.IsActiveUser)
+        {
+            Navigation.NavigateTo("/dashboard", replace: true);
+        }
+    }
+
+    private async Task RefreshStatusAsync()
+    {
+        if (_isRefreshing) return;
+
+        _isRefreshing = true;
+        _infoMessage = null;
+        _errorMessage = null;
+
+        try
+        {
+            var result = await UserApi.GetMyProfileAsync();
+
+            if (!result.IsSuccess || result.Data is null)
+            {
+                _errorMessage = result.ErrorMessage ?? "Could not retrieve your current account status.";
+                return;
+            }
+
+            await Auth.UpdateUserAsync(result.Data);
+
+            switch (result.Data.Status)
+            {
+                case "ACTIVE":
+                    Snackbar.Add("Your account has been approved!", Severity.Success);
+                    Navigation.NavigateTo("/dashboard", replace: true);
+                    break;
+                case "PENDING_APPROVAL":
+                    _infoMessage = "Status checked: your account is still awaiting administrator approval.";
+                    break;
+                case "REJECTED":
+                case "BLOCKED":
+                    // UI updates automatically to display the REJECTED/BLOCKED alert
+                    break;
+                default:
+                    _infoMessage = $"Current status: {result.Data.Status}";
+                    break;
+            }
+        }
+        finally
+        {
+            _isRefreshing = false;
+        }
+    }
+
+    private async Task HandleLogoutAsync()
+    {
+        if (_isLoggingOut) return;
+
+        _isLoggingOut = true;
+        try
+        {
+            await SessionService.LogoutAsync();
+            Navigation.NavigateTo("/login", replace: true);
+        }
+        finally
+        {
+            _isLoggingOut = false;
+        }
+    }
+}

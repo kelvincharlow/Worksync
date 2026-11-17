@@ -28,6 +28,11 @@ public class AuthApiService
     public Task<ApiResult<AuthResponse>> LoginAsync(LoginRequest request)
         => PostAsync<AuthResponse>("auth/login", request, ApiErrorContext.Login);
 
+    public Task<ApiResult<AuthResponse>> RefreshAsync(string refreshToken)
+    => PostAsync<AuthResponse>(
+        "auth/refresh",
+        new RefreshTokenRequest { RefreshToken = refreshToken },
+        ApiErrorContext.ProtectedResource);
     public Task<ApiResult<PasswordResetResponse>> RequestPasswordResetAsync(PasswordResetRequest request)
         => PostAsync<PasswordResetResponse>("auth/forgot-password", request, ApiErrorContext.PublicAuth);
 

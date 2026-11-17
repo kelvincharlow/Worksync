@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Components.Authorization;
 using Worksync.Frontend.Services;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
@@ -21,8 +22,8 @@ if (!Uri.TryCreate(apiBaseUrl, UriKind.Absolute, out var apiUri)
     || (apiUri.Scheme != Uri.UriSchemeHttp && apiUri.Scheme != Uri.UriSchemeHttps))
     throw new InvalidOperationException("ApiBaseUrl must be an absolute HTTP(S) URL.");
 // Register HttpClient once using the configuration value
-builder.Services.AddScoped(_ => new HttpClient { BaseAddress = apiUri });
-
+builder.Services.AddSingleton(new ApiConfiguration(apiUri));
+// mudblazor services
 builder.Services.AddMudServices(config =>
 {
     config.SnackbarConfiguration.PositionClass = Defaults.Classes.Position.TopRight;
@@ -31,8 +32,40 @@ builder.Services.AddMudServices(config =>
     config.SnackbarConfiguration.HideTransitionDuration = 200;
 });
 
+
+// Authentication & Authorization state
+builder.Services.AddAuthorizationCore(options =>
+{
+    options.AddPolicy("ActiveUser", policy =>
+        policy.RequireAuthenticatedUser()
+              .RequireClaim("status", "ACTIVE"));
+
+    options.AddPolicy("ActiveAdmin", policy =>
+        policy.RequireAuthenticatedUser()
+              .RequireClaim("status", "ACTIVE")
+              .RequireRole("ADMIN"));
+});
+
 builder.Services.AddScoped<AuthState>();
+builder.Services.AddScoped<AuthenticationStateProvider, WorksyncAuthenticationStateProvider>();
+builder.Services.AddScoped<AuthSessionService>();
+builder.Services.AddTransient<AuthMessageHandler>();
 
-builder.Services.AddScoped<AuthApiService>();
+// Plain HttpClient for public auth & token refresh (prevents circular DI and refresh loops)
+builder.Services.AddHttpClient<AuthApiService>(client =>
+{
+    client.BaseAddress = apiUri;
+});
 
+// Authenticated HttpClient for protected API calls (/users/me, /admin/users, etc.)
+builder.Services.AddHttpClient("WorksyncApi", client =>
+{
+    client.BaseAddress = apiUri;
+})
+.AddHttpMessageHandler<AuthMessageHandler>();
+
+// Default injected HttpClient uses the authenticated pipeline
+builder.Services.AddScoped(sp =>
+    sp.GetRequiredService<IHttpClientFactory>().CreateClient("WorksyncApi"));
+builder.Services.AddScoped<UserApiService>();
 await builder.Build().RunAsync();

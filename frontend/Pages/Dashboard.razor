@@ -1,0 +1,142 @@
+@page "/dashboard"
+@attribute [Authorize(Policy = "ActiveUser")]
+@using Worksync.Frontend.Models.Shared
+
+@inject AuthState Auth
+@inject UserApiService UserApi
+
+<PageTitle>Dashboard · Worksync</PageTitle>
+
+<MudStack Spacing="4">
+    <div>
+        <h1 class="mud-typography mud-typography-h4 font-weight-bold mb-1">
+            Welcome, @DisplayFirstName
+        </h1>
+        <MudText Typo="Typo.body1" Color="Color.Secondary">
+            Your Worksync workspace overview.
+        </MudText>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_loadError))
+    {
+        <MudAlert Severity="Severity.Warning" Dense="true">
+            @_loadError
+        </MudAlert>
+    }
+
+    <MudGrid Spacing="3">
+        <MudItem xs="12" md="7">
+            <MudCard Elevation="2" Style="border-radius: 12px; height: 100%;">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Account details</MudText>
+                    </CardHeaderContent>
+                    <CardHeaderActions>
+                        <MudChip T="string"
+                                 Size="Size.Small"
+                                 Color="Color.Success"
+                                 Variant="Variant.Filled">
+                            @(CurrentUser?.Status ?? "ACTIVE")
+                        </MudChip>
+                    </CardHeaderActions>
+                </MudCardHeader>
+
+                <MudCardContent>
+                    <MudStack Spacing="2">
+                        <MudText Typo="Typo.body2">
+                            <strong>Full name:</strong> @($"{CurrentUser?.FirstName} {CurrentUser?.LastName}".Trim())
+                        </MudText>
+                        <MudText Typo="Typo.body2">
+                            <strong>Email:</strong> @CurrentUser?.Email
+                        </MudText>
+                        <MudText Typo="Typo.body2">
+                            <strong>Phone number:</strong> @CurrentUser?.PhoneNumber
+                        </MudText>
+                        <MudText Typo="Typo.body2">
+                            <strong>System role:</strong> @(CurrentUser?.Role ?? "USER")
+                        </MudText>
+                        @if (CurrentUser?.CreatedAt is not null)
+                        {
+                            <MudText Typo="Typo.body2">
+                                <strong>Member since:</strong> @CurrentUser.CreatedAt.Value.ToLocalTime().ToString("dd MMM yyyy")
+                            </MudText>
+                        }
+                    </MudStack>
+                </MudCardContent>
+
+                <MudCardActions Class="px-4 pb-4">
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Person"
+                               Href="/profile">
+                        Manage profile
+                    </MudButton>
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+
+        <AuthorizeView Policy="ActiveAdmin">
+            <Authorized>
+                <MudItem xs="12" md="5">
+                    <MudCard Elevation="2" Style="border-radius: 12px; height: 100%;">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.h6">Administration</MudText>
+                            </CardHeaderContent>
+                            <CardHeaderActions>
+                                <MudChip T="string"
+                                         Size="Size.Small"
+                                         Color="Color.Primary"
+                                         Variant="Variant.Outlined">
+                                    ADMIN
+                                </MudChip>
+                            </CardHeaderActions>
+                        </MudCardHeader>
+
+                        <MudCardContent>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                Review pending account registrations, inspect user details,
+                                and approve, reject, block, or unblock accounts.
+                            </MudText>
+                        </MudCardContent>
+
+                        <MudCardActions Class="px-4 pb-4">
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.ManageAccounts"
+                                       Href="/admin/users">
+                                Manage users
+                            </MudButton>
+                        </MudCardActions>
+                    </MudCard>
+                </MudItem>
+            </Authorized>
+        </AuthorizeView>
+    </MudGrid>
+</MudStack>
+
+@code {
+    private UserRecord? _profile;
+    private string? _loadError;
+
+    private UserRecord? CurrentUser => _profile ?? Auth.User;
+
+    private string DisplayFirstName =>
+        string.IsNullOrWhiteSpace(CurrentUser?.FirstName) ? "back" : CurrentUser!.FirstName;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _profile = Auth.User;
+
+        var result = await UserApi.GetMyProfileAsync();
+        if (result.IsSuccess && result.Data is not null)
+        {
+            _profile = result.Data;
+            await Auth.UpdateUserAsync(result.Data);
+        }
+        else if (result.StatusCode != 401)
+        {
+            _loadError = result.ErrorMessage ?? "Showing cached session details; could not refresh profile.";
+        }
+    }
+}

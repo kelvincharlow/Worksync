@@ -93,6 +93,8 @@
 
     [SupplyParameterFromQuery(Name = "passwordReset")]
     public bool? PasswordReset { get; set; }
+    [SupplyParameterFromQuery(Name = "sessionExpired")]
+    public bool? SessionExpired { get; set; }
 
     private readonly LoginRequest _loginModel = new();
     private EditContext _editContext = default!;
@@ -112,6 +114,8 @@
             _successMessage = "Account created. An administrator must approve it before you can access the workspace.";
         else if (PasswordReset == true)
             _successMessage = "Password reset complete. You can now sign in with your new password.";
+        else if (SessionExpired == true)
+            _errorMessage = "Your session has expired. Please sign in again.";
     }
 
     private async Task HandleLoginAsync()
@@ -142,7 +146,7 @@
                 return;
             }
 
-            Auth.SetSession(auth.AccessToken, auth.ExpiresIn, auth.User);
+           await Auth.SetSessionAsync(auth.AccessToken, auth.RefreshToken, auth.ExpiresIn, auth.User);
 
             switch (auth.User?.Status)
             {
@@ -153,7 +157,7 @@
                     Navigation.NavigateTo(SafeReturnUrl() ?? "/dashboard");
                     break;
                 default:
-                    Auth.Clear();
+                    await Auth.ClearAsync();
                     _errorMessage = auth.User?.Status == "BLOCKED"
                         ? "Your account has been blocked. Contact your administrator."
                         : "Your account was not approved. Contact your administrator.";
