@@ -10,9 +10,12 @@
 
 <PageTitle>Create account · Worksync</PageTitle>
 
-<div class="auth-shell">
-    <h1 class="auth-title">Create your account</h1>
-    <p class="auth-subtitle">Join your workspace. New accounts require administrator approval.</p>
+<div class="auth-shell auth-card">
+    <div class="text-center">
+        <img src="/images/logo.png" alt="WorkSync Logo" class="auth-card-logo" />
+        <h1 class="auth-title">Create your account</h1>
+        <p class="auth-subtitle">Join your workspace. New accounts require administrator approval.</p>
+    </div>
 
     @if (!string.IsNullOrEmpty(_errorMessage))
     {
