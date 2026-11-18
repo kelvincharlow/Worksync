@@ -3,6 +3,7 @@ package com.eclectics.worksync.users.controller;
 import com.eclectics.worksync.auth.security.JwtFilter;
 import com.eclectics.worksync.auth.security.SecurityConfig;
 import com.eclectics.worksync.auth.service.JwtService;
+import com.eclectics.worksync.auth.service.TokenBlocklistService;
 import com.eclectics.worksync.users.dto.*;
 import com.eclectics.worksync.users.entity.*;
 import com.eclectics.worksync.users.exception.UserNotFoundException;
@@ -35,7 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(controllers = {UserController.class, AdminUserController.class},
         properties = {"app.jwt.secret=users-controller-test-key-at-least-32-bytes",
                 "logging.level.org.springframework.web=INFO"})
-@Import({SecurityConfig.class, JwtFilter.class, JwtService.class})
+@Import({SecurityConfig.class, JwtFilter.class, JwtService.class, TokenBlocklistService.class})
 class UserControllerSecurityTests {
     private static final UUID ACTOR = UUID.randomUUID();
     private static final UUID TARGET = UUID.randomUUID();
