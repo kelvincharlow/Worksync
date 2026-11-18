@@ -16,14 +16,10 @@
                        Elevation="0"
                        Class="ws-sidebar">
                 <div class="ws-sidebar-inner">
-                    <div class="ws-logo-area">
-                        <span class="ws-logo-icon" aria-hidden="true">
-                            <MudIcon Icon="@Icons.Material.Rounded.GridView" Size="Size.Small" />
-                        </span>
-                        <div>
-                            <div class="ws-logo-name">WorkSync</div>
-                            <div class="ws-logo-mini">@(Auth.IsActiveAdmin ? "Administration" : "Workspace")</div>
-                        </div>
+                                       <div class="ws-logo-area">
+                        <a href="/dashboard" class="d-flex align-center">
+                            <img src="/images/logo.png" alt="WorkSync" class="ws-sidebar-logo" />
+                        </a>
                     </div>
 
                     <div class="ws-side-scroll">
