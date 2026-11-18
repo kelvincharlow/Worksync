@@ -16,3 +16,5 @@
 *.iml
 .DS_Store
 *.log
+
+frontend/publish/
