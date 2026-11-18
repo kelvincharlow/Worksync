@@ -39,7 +39,7 @@ dotnet restore frontend/Worksync.Frontend.csproj
 dotnet run --project frontend/Worksync.Frontend.csproj
 ```
 
-Open http://localhost:5000. `frontend/wwwroot/appsettings.json` supplies the public API base URL. All WebAssembly configuration is downloadable: never put secrets there. Deployment must supply the correct public URL in this JSON before publishing; server environment variables do not automatically configure static WebAssembly files. Local backend environment overrides include `DB_URL` and `SERVER_PORT`. JWT Bearer authentication is documented as planned; no custom security or CORS configuration exists yet. Configure exact origins and review CSRF behavior when implementing authentication. Use HTTPS in deployment.
+Open http://localhost:5000. `frontend/wwwroot/appsettings.json` supplies the public API base URL. All WebAssembly configuration is downloadable: never put secrets there. Deployment must supply the correct public URL in this JSON before publishing; server environment variables do not automatically configure static WebAssembly files. Local backend environment overrides include `DB_URL` and `SERVER_PORT`. JWT Bearer authentication is implemented. Configure exact frontend origins with `CORS_ALLOWED_ORIGINS`; see [CORS deployment](docs/cors-deployment.md) for Render/Vercel setup and verification. Use HTTPS in deployment.
 
 ## Build and verification
 
@@ -72,3 +72,9 @@ Version references: [Spring Boot requirements](https://docs.spring.io/spring-boo
 ## Optional password-reset email delivery
 
 Notifications provides an internal EmailNotificationService for Auth integration. SMTP sending is explicitly enabled with the `email` Spring profile and environment settings; it is absent by default rather than a fake sender. See [email delivery setup, failure handling and tests](docs/email-delivery.md). No email endpoints, Auth workflow or in-app notification tables are implemented by this capability.
+
+## First production administrator
+
+Use the explicit, interactive [first-admin bootstrap procedure](docs/first-admin-bootstrap.md).
+It is not a startup seed or public endpoint, refuses existing administrators/emails, and requires
+an operator to verify the target database before entering credentials. Never run it during deployment builds.
