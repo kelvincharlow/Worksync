@@ -3,10 +3,10 @@
 @using Worksync.Frontend.Models.Shared
 
 @inject AuthState Auth
-@inject AuthSessionService SessionService
 @inject UserApiService UserApi
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>Approval Status · Worksync</PageTitle>
 
@@ -79,7 +79,7 @@
                 <MudButton Variant="Variant.Filled"
                            Color="Color.Primary"
                            StartIcon="@Icons.Material.Filled.Refresh"
-                           Disabled="@(_isRefreshing || _isLoggingOut)"
+                           Disabled="@_isRefreshing"
                            OnClick="RefreshStatusAsync">
                     @(_isRefreshing ? "Checking status…" : "Refresh status")
                 </MudButton>
@@ -90,7 +90,7 @@
                                Color="Color.Primary"
                                StartIcon="@Icons.Material.Filled.Person"
                                Href="/profile"
-                               Disabled="@(_isRefreshing || _isLoggingOut)">
+                               Disabled="@_isRefreshing">
                         My profile
                     </MudButton>
                 }
@@ -98,9 +98,9 @@
                 <MudButton Variant="Variant.Text"
                            Color="Color.Error"
                            StartIcon="@Icons.Material.Filled.Logout"
-                           Disabled="@(_isRefreshing || _isLoggingOut)"
-                           OnClick="HandleLogoutAsync">
-                    @(_isLoggingOut ? "Signing out…" : "Sign out")
+                           Disabled="@_isRefreshing"
+                           OnClick="OpenLogoutDialogAsync">
+                    Sign out
                 </MudButton>
             </MudStack>
         </MudStack>
@@ -109,7 +109,6 @@
 
 @code {
     private bool _isRefreshing;
-    private bool _isLoggingOut;
     private string? _infoMessage;
     private string? _errorMessage;
 
@@ -174,19 +173,18 @@
         }
     }
 
-    private async Task HandleLogoutAsync()
+    private async Task OpenLogoutDialogAsync()
     {
-        if (_isLoggingOut) return;
+        var options = new DialogOptions
+        {
+            NoHeader = true,
+            MaxWidth = MaxWidth.ExtraSmall,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+            BackdropClick = true,
+            BackgroundClass = "logout-dialog-backdrop"
+        };
 
-        _isLoggingOut = true;
-        try
-        {
-            await SessionService.LogoutAsync();
-            Navigation.NavigateTo("/login", replace: true);
-        }
-        finally
-        {
-            _isLoggingOut = false;
-        }
+        await DialogService.ShowAsync<LogoutConfirmDialog>(string.Empty, options);
     }
 }

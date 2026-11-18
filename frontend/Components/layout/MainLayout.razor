@@ -3,133 +3,125 @@
 @implements IDisposable
 
 @inject AuthState Auth
-@inject AuthSessionService SessionService
 @inject NavigationManager Navigation
-@inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <MudLayout>
-    <MudAppBar Elevation="1" Style="background-color: #1B2A4A; color: #FFFFFF;">
-        <AuthorizeView>
-            <Authorized>
-                <MudIconButton Icon="@Icons.Material.Filled.Menu"
-               Color="Color.Inherit"
-               Edge="Edge.Start"
-               aria-label="Toggle navigation menu"
-               OnClick="ToggleDrawer" />
-            </Authorized>
-        </AuthorizeView>
-
-        <MudLink Href="@(Auth.IsActiveUser ? "/dashboard" : "/pending-approval")"
-                 Color="Color.Inherit"
-                 Underline="Underline.None"
-                 Class="d-flex align-center ml-1">
-            <MudText Typo="Typo.h6" Class="font-weight-bold">Worksync</MudText>
-        </MudLink>
-
-        <MudSpacer />
-
-        <AuthorizeView>
-            <Authorized>
-                <MudHidden Breakpoint="Breakpoint.Xs">
-                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mr-3">
-                        <MudText Typo="Typo.body2">@DisplayName</MudText>
-                        @if (!string.IsNullOrWhiteSpace(Auth.User?.Role))
-                        {
-                            <MudChip T="string"
-                                     Size="Size.Small"
-                                     Variant="Variant.Outlined"
-                                     Color="Color.Inherit">
-                                @Auth.User!.Role
-                            </MudChip>
-                        }
-                    </MudStack>
-                </MudHidden>
-
-                <MudButton Variant="Variant.Text"
-                           Color="Color.Inherit"
-                           StartIcon="@Icons.Material.Filled.Person"
-                           Href="/profile"
-                           Class="mr-1">
-                    Profile
-                </MudButton>
-
-                <MudButton Variant="Variant.Text"
-                           Color="Color.Inherit"
-                           StartIcon="@Icons.Material.Filled.Logout"
-                           Disabled="@_isLoggingOut"
-                           OnClick="HandleLogoutAsync">
-                    @(_isLoggingOut ? "Signing out…" : "Sign out")
-                </MudButton>
-            </Authorized>
-            <NotAuthorized>
-                <MudButton Variant="Variant.Text" Color="Color.Inherit" Href="/login">
-                    Sign in
-                </MudButton>
-            </NotAuthorized>
-        </AuthorizeView>
-    </MudAppBar>
-
     <AuthorizeView>
         <Authorized>
             <MudDrawer @bind-Open="_drawerOpen"
-                       ClipMode="DrawerClipMode.Always"
-                       Elevation="1"
-                       Variant="DrawerVariant.Responsive">
-                <MudNavMenu Class="pt-2 d-flex flex-column" Style="height: 100%;">
-                    @if (Auth.IsActiveUser)
-                    {
-                        <MudNavLink Href="/dashboard"
-                                    Match="NavLinkMatch.All"
-                                    Icon="@Icons.Material.Filled.Dashboard">
-                            Dashboard
-                        </MudNavLink>
-                    }
-                    else
-                    {
-                        <MudNavLink Href="/pending-approval"
-                                    Match="NavLinkMatch.All"
-                                    Icon="@Icons.Material.Filled.HourglassTop">
-                            Approval status
-                        </MudNavLink>
-                    }
-
-                    <MudNavLink Href="/profile"
-                                Match="NavLinkMatch.All"
-                                Icon="@Icons.Material.Filled.Person">
-                        My profile
-                    </MudNavLink>
-
-                    @if (Auth.IsActiveAdmin)
-                    {
-                        <MudText Typo="Typo.overline" Class="px-4 pt-4 pb-1 mud-text-secondary">
-                            Administration
-                        </MudText>
-                        <MudNavLink Href="/admin/users"
-                                    Match="NavLinkMatch.Prefix"
-                                    Icon="@Icons.Material.Filled.ManageAccounts">
-                            User management
-                        </MudNavLink>
-                    }
-
-                    <MudDivider Class="my-3" />
-
-                    <div class="px-3 pb-4">
-                        <MudButton Variant="Variant.Outlined"
-                                   Color="Color.Error"
-                                   FullWidth="true"
-                                   StartIcon="@Icons.Material.Filled.Logout"
-                                   Disabled="@_isLoggingOut"
-                                   OnClick="HandleLogoutAsync">
-                            @(_isLoggingOut ? "Signing out…" : "Sign out")
-                        </MudButton>
+                       Width="256px"
+                       ClipMode="DrawerClipMode.Never"
+                       Variant="DrawerVariant.Responsive"
+                       Elevation="0"
+                       Class="ws-sidebar">
+                <div class="ws-sidebar-inner">
+                    <div class="ws-logo-area">
+                        <span class="ws-logo-icon" aria-hidden="true">
+                            <MudIcon Icon="@Icons.Material.Rounded.GridView" Size="Size.Small" />
+                        </span>
+                        <div>
+                            <div class="ws-logo-name">WorkSync</div>
+                            <div class="ws-logo-mini">@(Auth.IsActiveAdmin ? "Administration" : "Workspace")</div>
+                        </div>
                     </div>
-                </MudNavMenu>
+
+                    <div class="ws-side-scroll">
+                        <div class="ws-nav-label">Workspace</div>
+                        @if (Auth.IsActiveUser)
+                        {
+                            <NavLink href="/dashboard" Match="NavLinkMatch.All" class="ws-nav-link">
+                                <MudIcon Icon="@Icons.Material.Outlined.Home" Size="Size.Small" />
+                                <span>Overview</span>
+                            </NavLink>
+                        }
+                        else
+                        {
+                            <NavLink href="/pending-approval" Match="NavLinkMatch.All" class="ws-nav-link">
+                                <MudIcon Icon="@Icons.Material.Outlined.HourglassEmpty" Size="Size.Small" />
+                                <span>Approval Status</span>
+                            </NavLink>
+                        }
+
+                        @if (Auth.IsActiveAdmin)
+                        {
+                            <div class="ws-nav-label">Administration</div>
+                            <NavLink href="/admin/approvals" Match="NavLinkMatch.Prefix" class="ws-nav-link">
+                                <MudIcon Icon="@Icons.Material.Outlined.HowToReg" Size="Size.Small" />
+                                <span>Approvals</span>
+                            </NavLink>
+                            <NavLink href="/admin/users" Match="NavLinkMatch.Prefix" class="ws-nav-link">
+                                <MudIcon Icon="@Icons.Material.Outlined.Group" Size="Size.Small" />
+                                <span>User Management</span>
+                            </NavLink>
+                        }
+                    </div>
+
+                    <div class="ws-side-bottom">
+                        <div class="ws-user-chip">
+                            <div class="ws-avatar">@Initials</div>
+                            <div class="ws-user-who">
+                                <strong>@DisplayName</strong>
+                                <small>@(Auth.IsActiveAdmin ? "System Administrator" : Auth.User?.Role ?? "Member")</small>
+                            </div>
+                        </div>
+
+                        <NavLink href="/profile" Match="NavLinkMatch.All" class="ws-nav-link">
+                            <MudIcon Icon="@Icons.Material.Outlined.PersonOutline" Size="Size.Small" />
+                            <span>My Profile</span>
+                        </NavLink>
+
+                        <button type="button" class="ws-nav-link ws-logout" @onclick="OpenLogoutDialogAsync">
+                            <MudIcon Icon="@Icons.Material.Outlined.Logout" Size="Size.Small" />
+                            <span>Log Out</span>
+                        </button>
+                    </div>
+                </div>
             </MudDrawer>
         </Authorized>
     </AuthorizeView>
 
-    <MudMainContent>
-        <MudContainer MaxWidth="MaxWidth.Large" Class="py-6 px-4">
+    <MudAppBar Elevation="0" Class="ws-topbar" Style="height: 72px; justify-content: center;">
+        <div class="d-flex align-center justify-space-between w-100 px-2">
+            <div class="ws-breadcrumb">
+                <AuthorizeView>
+                    <Authorized>
+                        <MudIconButton Icon="@Icons.Material.Filled.Menu"
+                                       Color="Color.Inherit"
+                                       Edge="Edge.Start"
+                                       aria-label="Toggle navigation menu"
+                                       OnClick="ToggleDrawer"
+                                       Class="d-md-none mr-1" />
+                    </Authorized>
+                </AuthorizeView>
+
+                <span>WorkSync</span>
+                <MudIcon Icon="@Icons.Material.Rounded.ChevronRight" Size="Size.Small" />
+                <span>@SectionName</span>
+                <MudIcon Icon="@Icons.Material.Rounded.ChevronRight" Size="Size.Small" />
+                <strong>@PageTitleText</strong>
+            </div>
+
+            <AuthorizeView>
+                <Authorized>
+                    <div class="d-flex align-center gap-3">
+                        <MudHidden Breakpoint="Breakpoint.SmAndDown">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                @(Auth.IsActiveAdmin ? "Administrator workspace" : "Member workspace")
+                            </MudText>
+                        </MudHidden>
+                        <a href="/profile" class="ws-top-avatar" title="View my profile">@Initials</a>
+                    </div>
+                </Authorized>
+                <NotAuthorized>
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/login">Sign in</MudButton>
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
+    </MudAppBar>
+
+    <MudMainContent Style="background-color: #F6F8FC; min-height: 100vh;">
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-7 px-4 px-sm-8">
             @Body
         </MudContainer>
     </MudMainContent>
@@ -137,7 +129,6 @@
 
 @code {
     private bool _drawerOpen = true;
-    private bool _isLoggingOut;
 
     private string DisplayName
     {
@@ -148,48 +139,70 @@
         }
     }
 
+    private string Initials
+    {
+        get
+        {
+            var f = Auth.User?.FirstName?.Trim();
+            var l = Auth.User?.LastName?.Trim();
+            if (!string.IsNullOrEmpty(f) && !string.IsNullOrEmpty(l))
+                return $"{char.ToUpperInvariant(f[0])}{char.ToUpperInvariant(l[0])}";
+            var email = Auth.User?.Email?.Trim();
+            return !string.IsNullOrEmpty(email) ? char.ToUpperInvariant(email[0]).ToString() : "W";
+        }
+    }
+
+    private string CurrentRoute => Navigation.ToBaseRelativePath(Navigation.Uri)
+        .Split('?', '#')[0]
+        .Trim('/')
+        .ToLowerInvariant();
+
+    private string SectionName => CurrentRoute.StartsWith("admin") ? "Administration"
+        : CurrentRoute == "profile" ? "My Account"
+        : "Workspace";
+
+    private string PageTitleText => CurrentRoute switch
+    {
+        "dashboard" => "Overview",
+        "admin/approvals" => "Approvals",
+        "admin/users" => "User Management",
+        "profile" => "My Profile",
+        "pending-approval" => "Approval Status",
+        _ => "WorkSync"
+    };
+
     protected override async Task OnInitializedAsync()
     {
-        Auth.OnChange += HandleAuthChanged;
+        Auth.OnChange += HandleStateChanged;
+        Navigation.LocationChanged += HandleLocationChanged;
         await Auth.InitializeAsync();
     }
 
     private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
 
-    private void HandleAuthChanged()
+    private void HandleStateChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private void HandleLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+        => _ = InvokeAsync(StateHasChanged);
+
+    private async Task OpenLogoutDialogAsync()
     {
-        _ = InvokeAsync(StateHasChanged);
-    }
-
-    private async Task HandleLogoutAsync()
-    {
-        if (_isLoggingOut) return;
-
-        _isLoggingOut = true;
-        try
+        var options = new DialogOptions
         {
-            var result = await SessionService.LogoutAsync();
-            if (!result.IsSuccess)
-            {
-                Snackbar.Add(
-                    result.ErrorMessage ?? "Could not notify server, but your local session was cleared.",
-                    Severity.Warning);
-            }
-            else
-            {
-                Snackbar.Add("Signed out.", Severity.Info);
-            }
+            NoHeader = true,
+            MaxWidth = MaxWidth.ExtraSmall,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+            BackdropClick = true,
+            BackgroundClass = "logout-dialog-backdrop"
+        };
 
-            Navigation.NavigateTo("/login", replace: true);
-        }
-        finally
-        {
-            _isLoggingOut = false;
-        }
+        await DialogService.ShowAsync<LogoutConfirmDialog>(string.Empty, options);
     }
 
     public void Dispose()
     {
-        Auth.OnChange -= HandleAuthChanged;
+        Auth.OnChange -= HandleStateChanged;
+        Navigation.LocationChanged -= HandleLocationChanged;
     }
 }
