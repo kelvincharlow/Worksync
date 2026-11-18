@@ -84,6 +84,15 @@ public class User {
         this.passwordHash = passwordHash;
     }
 
+    /** First-install operator workflow only; public registration must use the normal constructor. */
+    public static User initialAdministrator(String firstName, String lastName, String email,
+            String phoneNumber, String passwordHash) {
+        User user = new User(firstName, lastName, email, phoneNumber, passwordHash);
+        user.role = SystemRole.ADMIN;
+        user.approve();
+        return user;
+    }
+
     private static String normalizeEmail(String email) {
         return Objects.requireNonNull(email, "email is required").trim().toLowerCase(Locale.ROOT);
     }

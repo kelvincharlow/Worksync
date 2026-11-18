@@ -25,6 +25,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @Query(value = "SELECT 1 FROM pg_advisory_xact_lock(1465075027, 1)", nativeQuery = true)
     int lockAccountLifecycle();
 
+    boolean existsByRole(SystemRole role);
+
     long countByRoleAndStatus(SystemRole role, AccountStatus status);
 
     Page<User> findByStatus(AccountStatus status, Pageable pageable);
