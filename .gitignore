@@ -16,3 +16,6 @@
 *.iml
 .DS_Store
 *.log
+#vercel.json
+frontend/.dotnet/
+frontend/publish/
