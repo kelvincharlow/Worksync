@@ -1,0 +1,95 @@
+@namespace Worksync.Frontend.Components.Layout
+
+@inject AuthSessionService SessionService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <div class="logout-dialog-body text-center pa-4">
+            <div class="logout-warning-badge mb-4" aria-hidden="true">
+                <MudIcon Icon="@Icons.Material.Outlined.WarningAmber" Size="Size.Large" />
+            </div>
+
+            <MudText Typo="Typo.h6" Class="font-weight-bold mb-2">
+                Log out of Worksync?
+            </MudText>
+
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-6">
+                You will need to sign in again to access your workspace.
+            </MudText>
+
+            <MudStack Row="true" Spacing="2" Justify="Justify.Center">
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Default"
+                           FullWidth="true"
+                           Disabled="@_isLoggingOut"
+                           OnClick="Cancel">
+                    Cancel
+                </MudButton>
+
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Error"
+                           FullWidth="true"
+                           Disabled="@_isLoggingOut"
+                           OnClick="ConfirmLogoutAsync">
+                    @if (_isLoggingOut)
+                    {
+                        <MudProgressCircular Size="Size.Small"
+                                             Indeterminate="true"
+                                             Color="Color.Inherit"
+                                             Class="mr-2" />
+                        <span>Logging out…</span>
+                    }
+                    else
+                    {
+                        <span>Log out</span>
+                    }
+                </MudButton>
+            </MudStack>
+        </div>
+    </DialogContent>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private bool _isLoggingOut;
+
+    private void Cancel()
+    {
+        if (!_isLoggingOut)
+            MudDialog.Cancel();
+    }
+
+    private async Task ConfirmLogoutAsync()
+    {
+        if (_isLoggingOut) return;
+
+        _isLoggingOut = true;
+        try
+        {
+            var result = await SessionService.LogoutAsync();
+
+            MudDialog.Close(DialogResult.Ok(true));
+
+            if (!result.IsSuccess)
+            {
+                Snackbar.Add(
+                    result.ErrorMessage ?? "Could not notify server, but your local session was cleared.",
+                    Severity.Warning);
+            }
+            else
+            {
+                Snackbar.Add("Logged out.", Severity.Info);
+            }
+
+            Navigation.NavigateTo("/login", replace: true);
+        }
+        finally
+        {
+            _isLoggingOut = false;
+        }
+    }
+}

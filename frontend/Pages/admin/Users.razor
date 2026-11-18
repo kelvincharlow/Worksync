@@ -1,0 +1,268 @@
+@page "/admin/users"
+@attribute [Authorize(Policy = "ActiveAdmin")]
+
+@inject UserApiService UserApi
+@inject IDialogService DialogService
+
+<PageTitle>User Management · Worksync</PageTitle>
+
+<MudStack Spacing="4">
+    <div class="d-flex justify-space-between align-start flex-wrap gap-3">
+        <div>
+            <p class="ws-eyebrow">Administration</p>
+            <h1 class="ws-page-title">User Management</h1>
+            <p class="ws-page-desc">View registered accounts and manage their access status.</p>
+        </div>
+
+        <MudButton Variant="Variant.Outlined"
+                   StartIcon="@Icons.Material.Outlined.Refresh"
+                   Disabled="@_isLoading"
+                   OnClick="LoadUsersAsync">
+            @(_isLoading ? "Refreshing…" : "Refresh")
+        </MudButton>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <MudAlert Severity="Severity.Error" Dense="true">@_errorMessage</MudAlert>
+    }
+
+    <section class="ws-panel">
+        <div class="ws-panel-header">
+            <div>
+                <h2>
+                    All accounts
+                    <span class="ws-pill ml-2">@_totalElements</span>
+                </h2>
+                <p>Filter accounts by status via the backend API or search the loaded page.</p>
+            </div>
+
+            <div class="d-flex align-center gap-2 flex-wrap">
+                <div style="min-width: 210px;">
+                    <MudTextField T="string"
+                                  @bind-Value="_search"
+                                  Placeholder="Filter loaded page…"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Outlined.Search"
+                                  Immediate="true" />
+                </div>
+
+                <div style="min-width: 170px;">
+                    <MudSelect T="string"
+                               Value="_statusFilter"
+                               ValueChanged="OnStatusFilterChangedAsync"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                               aria-label="Filter by account status">
+                        <MudSelectItem Value="@("ALL")">All statuses</MudSelectItem>
+                        <MudSelectItem Value="@("PENDING_APPROVAL")">Pending</MudSelectItem>
+                        <MudSelectItem Value="@("ACTIVE")">Active</MudSelectItem>
+                        <MudSelectItem Value="@("BLOCKED")">Blocked</MudSelectItem>
+                        <MudSelectItem Value="@("REJECTED")">Rejected</MudSelectItem>
+                    </MudSelect>
+                </div>
+            </div>
+        </div>
+
+        @if (_isLoading)
+        {
+            <div class="pa-10 d-flex justify-center">
+                <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+            </div>
+        }
+        else if (FilteredUsers.Count == 0)
+        {
+            <div class="ws-empty">
+                <MudIcon Icon="@Icons.Material.Outlined.GroupOff" Size="Size.Large" Color="Color.Default" />
+                <h3>No users found</h3>
+                <p>Try selecting another status filter or clearing your search.</p>
+            </div>
+        }
+        else
+        {
+            <div class="ws-table-wrap">
+                <table class="ws-table">
+                    <thead>
+                        <tr>
+                            <th>User</th>
+                            <th>Role</th>
+                            <th>Status</th>
+                            <th>Registered</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var user in FilteredUsers)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="ws-person">
+                                        <div class="ws-avatar">@GetInitials(user)</div>
+                                        <div>
+                                            <span class="ws-person-name">@($"{user.FirstName} {user.LastName}".Trim())</span>
+                                            <span class="ws-person-email">@user.Email</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>@user.Role</td>
+                                <td><span class="ws-status-pill @user.Status">@FormatStatus(user.Status)</span></td>
+                                <td>@(user.CreatedAt?.ToLocalTime().ToString("d MMM yyyy") ?? "—")</td>
+                                <td>
+                                    <MudButton Variant="Variant.Outlined"
+                                               Size="Size.Small"
+                                               OnClick="@(() => OpenReviewAsync(user.Id))">
+                                        View details
+                                    </MudButton>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        <div class="d-flex justify-space-between align-center pa-4" style="border-top: 1px solid #E2E8F0; font-size: 0.78rem; color: #64748B;">
+            <span>
+                Showing @RangeStart–@RangeEnd of @_totalElements accounts · Page @(_page + 1) / @_totalPages
+            </span>
+            <div class="d-flex gap-2">
+                <MudButton Variant="Variant.Outlined"
+                           Size="Size.Small"
+                           Disabled="@(_isLoading || _page == 0)"
+                           OnClick="PreviousPageAsync">
+                    Previous
+                </MudButton>
+                <MudButton Variant="Variant.Outlined"
+                           Size="Size.Small"
+                           Disabled="@(_isLoading || _page >= _totalPages - 1)"
+                           OnClick="NextPageAsync">
+                    Next
+                </MudButton>
+            </div>
+        </div>
+    </section>
+</MudStack>
+
+@code {
+    private const int PageSize = 10;
+
+    private List<UserRecord> _users = new();
+    private string _statusFilter = "ALL";
+    private string _search = string.Empty;
+    private int _page;
+    private int _totalPages = 1;
+    private long _totalElements;
+    private bool _isLoading = true;
+    private string? _errorMessage;
+
+    private List<UserRecord> FilteredUsers => string.IsNullOrWhiteSpace(_search)
+        ? _users
+        : _users.Where(u =>
+                $"{u.FirstName} {u.LastName} {u.Email} {u.PhoneNumber}"
+                    .Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+    private long RangeStart => _totalElements == 0 ? 0 : (_page * PageSize) + 1;
+    private long RangeEnd => Math.Min(_totalElements, (_page + 1) * (long)PageSize);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUsersAsync();
+    }
+
+    private async Task OnStatusFilterChangedAsync(string newStatus)
+    {
+        _statusFilter = newStatus;
+        _page = 0;
+        await LoadUsersAsync();
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var result = await UserApi.GetAdminUsersAsync(_statusFilter, _page, PageSize);
+            if (result.IsSuccess && result.Data is not null)
+            {
+                _users = result.Data.Content;
+                _totalElements = result.Data.TotalElements;
+                _totalPages = result.Data.TotalPages;
+            }
+            else
+            {
+                _users.Clear();
+                _errorMessage = result.ErrorMessage ?? "Could not load users.";
+            }
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task PreviousPageAsync()
+    {
+        if (_page > 0)
+        {
+            _page--;
+            await LoadUsersAsync();
+        }
+    }
+
+    private async Task NextPageAsync()
+    {
+        if (_page < _totalPages - 1)
+        {
+            _page++;
+            await LoadUsersAsync();
+        }
+    }
+
+    private async Task OpenReviewAsync(string userId)
+    {
+        var parameters = new DialogParameters<UserReviewDialog>
+        {
+            { x => x.UserId, userId }
+        };
+
+        var options = new DialogOptions
+        {
+            NoHeader = true,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+            BackdropClick = true,
+            BackgroundClass = "logout-dialog-backdrop"
+        };
+
+        var dialog = await DialogService.ShowAsync<UserReviewDialog>(string.Empty, parameters, options);
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled)
+        {
+            await LoadUsersAsync();
+        }
+    }
+
+    private static string GetInitials(UserRecord user)
+    {
+        var f = user.FirstName?.Trim();
+        var l = user.LastName?.Trim();
+        if (!string.IsNullOrEmpty(f) && !string.IsNullOrEmpty(l))
+            return $"{char.ToUpperInvariant(f[0])}{char.ToUpperInvariant(l[0])}";
+        return !string.IsNullOrEmpty(user.Email) ? char.ToUpperInvariant(user.Email[0]).ToString() : "U";
+    }
+
+    private static string FormatStatus(string status) => status switch
+    {
+        "PENDING_APPROVAL" => "Pending",
+        "ACTIVE" => "Active",
+        "REJECTED" => "Rejected",
+        "BLOCKED" => "Blocked",
+        _ => status
+    };
+}

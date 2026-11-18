@@ -1,21 +1,77 @@
-<MudThemeProvider Theme="@AppTheme.Theme" />
-<MudPopoverProvider />
-<MudDialogProvider />
-<MudSnackbarProvider />
+@inject AuthState Auth
 
-<Router AppAssembly="@typeof(App).Assembly">
-    <Found Context="routeData">
-        <RouteView RouteData="@routeData"
-                   DefaultLayout="@typeof(MainLayout)" />
+<CascadingAuthenticationState>
+    <MudThemeProvider Theme="@AppTheme.Theme" />
+    <MudPopoverProvider />
+    <MudDialogProvider />
+    <MudSnackbarProvider />
 
-        <FocusOnNavigate RouteData="@routeData"
-                         Selector="h1" />
-    </Found>
+    <Router AppAssembly="@typeof(App).Assembly">
+        <Found Context="routeData">
+            <AuthorizeRouteView RouteData="@routeData"
+                                DefaultLayout="@typeof(MainLayout)">
+                <Authorizing>
+                    <LayoutView Layout="@typeof(MainLayout)">
+                        <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Class="pa-12">
+                            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+                            <MudText Typo="Typo.body1">Checking your session…</MudText>
+                        </MudStack>
+                    </LayoutView>
+                </Authorizing>
+                <NotAuthorized>
+                    @if (context.User.Identity?.IsAuthenticated != true)
+                    {
+                        <RedirectToLogin />
+                    }
+                    else if (string.Equals(Auth.User?.Status, "PENDING_APPROVAL", StringComparison.OrdinalIgnoreCase))
+                    {
+                        <MudContainer MaxWidth="MaxWidth.Small" Class="mt-10">
+                            <MudPaper Elevation="2" Class="pa-6">
+                                <MudAlert Severity="Severity.Info" Class="mb-4">
+                                    Your account is currently awaiting administrator approval.
+                                </MudAlert>
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/pending-approval">
+                                    View approval status
+                                </MudButton>
+                            </MudPaper>
+                        </MudContainer>
+                    }
+                    else
+                    {
+                        <MudContainer MaxWidth="MaxWidth.Small" Class="mt-10">
+                            <MudPaper Elevation="2" Class="pa-6">
+                                <MudText Typo="Typo.h5" Class="mb-2">Access denied (403)</MudText>
+                                <MudAlert Severity="Severity.Error" Class="mb-4">
+                                    You do not have permission to view this page.
+                                </MudAlert>
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/dashboard">
+                                    Back to dashboard
+                                </MudButton>
+                            </MudPaper>
+                        </MudContainer>
+                    }
+                </NotAuthorized>
+            </AuthorizeRouteView>
 
-    <NotFound>
-        <LayoutView Layout="@typeof(MainLayout)">
-            <h1>Page not found</h1>
-            <a href="/">Return home</a>
-        </LayoutView>
-    </NotFound>
-</Router>
+            <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+        </Found>
+
+        <NotFound>
+            <LayoutView Layout="@typeof(MainLayout)">
+                <MudContainer MaxWidth="MaxWidth.Small" Class="mt-10">
+                    <MudPaper Elevation="2" Class="pa-6">
+                        <MudText Typo="Typo.h5" Class="mb-2">Page not found</MudText>
+                        <MudText Typo="Typo.body2" Class="mb-4">
+                            The page you requested does not exist.
+                        </MudText>
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   Href="@(Auth.IsActiveUser ? "/dashboard" : "/login")">
+                            @(Auth.IsActiveUser ? "Go to dashboard" : "Go to sign in")
+                        </MudButton>
+                    </MudPaper>
+                </MudContainer>
+            </LayoutView>
+        </NotFound>
+    </Router>
+</CascadingAuthenticationState>

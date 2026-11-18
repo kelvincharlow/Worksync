@@ -1,0 +1,363 @@
+@namespace Worksync.Frontend.Components.Admin
+
+@inject UserApiService UserApi
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <div class="logout-dialog-body pa-2">
+            @if (_isLoading)
+            {
+                <div class="pa-8 d-flex flex-column align-center gap-3">
+                    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Loading account details…</MudText>
+                </div>
+            }
+            else if (!string.IsNullOrWhiteSpace(_loadError))
+            {
+                <div class="pa-3">
+                    <div class="d-flex justify-space-between align-center mb-3">
+                        <MudText Typo="Typo.h6" Class="font-weight-bold">Account details</MudText>
+                        <MudIconButton Icon="@Icons.Material.Outlined.Close"
+                                       Size="Size.Small"
+                                       aria-label="Close"
+                                       OnClick="Close" />
+                    </div>
+
+                    <MudAlert Severity="Severity.Error" Class="mb-4">@_loadError</MudAlert>
+
+                    <div class="d-flex justify-end gap-2">
+                        <MudButton Variant="Variant.Outlined" OnClick="Close">Close</MudButton>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadUserAsync">
+                            Retry
+                        </MudButton>
+                    </div>
+                </div>
+            }
+            else if (_user is not null && _pendingAction is null)
+            {
+                @* STEP 1: DETAILS VIEW *@
+                <div class="d-flex justify-space-between align-center mb-4">
+                    <MudText Typo="Typo.h6" Class="font-weight-bold">
+                        @(_user.Status == "PENDING_APPROVAL" ? "Review registration" : "Account details")
+                    </MudText>
+                    <MudIconButton Icon="@Icons.Material.Outlined.Close"
+                                   Size="Size.Small"
+                                   aria-label="Close"
+                                   OnClick="Close" />
+                </div>
+
+                <div class="d-flex align-center gap-3 pa-4 mb-4"
+                     style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px;">
+                    <div class="ws-avatar" style="width: 44px; height: 44px; font-size: 0.9rem;">
+                        @GetInitials(_user)
+                    </div>
+                    <div style="min-width: 0;">
+                        <strong style="font-size: 0.95rem; color: #0F172A; display: block;">
+                            @($"{_user.FirstName} {_user.LastName}".Trim())
+                        </strong>
+                        <span style="font-size: 0.8rem; color: #64748B; display: block; margin-bottom: 5px;">
+                            @_user.Email
+                        </span>
+                        <span class="ws-status-pill @_user.Status">@FormatStatus(_user.Status)</span>
+                    </div>
+                </div>
+
+                <MudGrid Spacing="2" Class="mb-4">
+                    <MudItem xs="6">
+                        <div class="text-caption mud-text-secondary text-uppercase font-weight-bold">First name</div>
+                        <div class="text-body2 font-weight-medium">@_user.FirstName</div>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <div class="text-caption mud-text-secondary text-uppercase font-weight-bold">Last name</div>
+                        <div class="text-body2 font-weight-medium">@_user.LastName</div>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <div class="text-caption mud-text-secondary text-uppercase font-weight-bold">Phone number</div>
+                        <div class="text-body2 font-weight-medium">@_user.PhoneNumber</div>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <div class="text-caption mud-text-secondary text-uppercase font-weight-bold">Account role</div>
+                        <div class="text-body2 font-weight-medium">@_user.Role</div>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <div class="text-caption mud-text-secondary text-uppercase font-weight-bold">Registered</div>
+                        <div class="text-body2 font-weight-medium">@FormatDate(_user.CreatedAt)</div>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <div class="text-caption mud-text-secondary text-uppercase font-weight-bold">Current status</div>
+                        <div class="text-body2 font-weight-medium">@_user.Status.Replace('_', ' ')</div>
+                    </MudItem>
+                </MudGrid>
+
+                <MudDivider Class="mb-4" />
+
+                <div class="d-flex justify-end gap-2 flex-wrap">
+                    <MudButton Variant="Variant.Outlined" OnClick="Close">Close</MudButton>
+
+                    @if (_user.Status == "PENDING_APPROVAL")
+                    {
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Error"
+                                   OnClick="@(() => StartAction("reject"))">
+                            Reject
+                        </MudButton>
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Outlined.Check"
+                                   OnClick="@(() => StartAction("approve"))">
+                            Approve user
+                        </MudButton>
+                    }
+                    else if (_user.Status == "ACTIVE")
+                    {
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Error"
+                                   StartIcon="@Icons.Material.Outlined.Block"
+                                   OnClick="@(() => StartAction("block"))">
+                            Block user
+                        </MudButton>
+                    }
+                    else if (_user.Status == "BLOCKED")
+                    {
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Outlined.Check"
+                                   OnClick="@(() => StartAction("unblock"))">
+                            Unblock user
+                        </MudButton>
+                    }
+                </div>
+            }
+            else if (_user is not null && _pendingAction is not null)
+            {
+                @* STEP 2: CONFIRM ACCOUNT ACTION *@
+                <div class="d-flex justify-space-between align-center mb-3">
+                    <MudText Typo="Typo.h6" Class="font-weight-bold">@ActionHeading</MudText>
+                    <MudIconButton Icon="@Icons.Material.Outlined.Close"
+                                   Size="Size.Small"
+                                   Disabled="@_isSubmitting"
+                                   aria-label="Close"
+                                   OnClick="Close" />
+                </div>
+
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                    Are you sure you want to <strong>@_pendingAction</strong>
+                    <strong>@($"{_user.FirstName} {_user.LastName}".Trim())</strong>?
+                </MudText>
+
+                <MudAlert Severity="@(IsDestructiveAction ? Severity.Warning : Severity.Info)"
+                          Dense="true"
+                          Class="mb-4">
+                    @ActionExplanation
+                </MudAlert>
+
+                @if (_pendingAction is "reject" or "block" or "unblock")
+                {
+                    <div class="ws-profile-field mb-4">
+                        <label for="action-reason">Reason (optional)</label>
+                        <textarea id="action-reason"
+                                  class="ws-profile-input"
+                                  style="height: 84px; padding: 10px 12px; resize: vertical;"
+                                  maxlength="500"
+                                  placeholder="Optional note (max 500 characters)"
+                                  disabled="@_isSubmitting"
+                                  @bind="_reason"></textarea>
+                        <span class="auth-hint">
+                            Not saved: the current backend validates reasons but does not store audit history.
+                        </span>
+                    </div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(_actionError))
+                {
+                    <MudAlert Severity="Severity.Error" Dense="true" Class="mb-4">@_actionError</MudAlert>
+                }
+
+                <MudDivider Class="mb-4" />
+
+                <div class="d-flex justify-end gap-2 flex-wrap">
+                    <MudButton Variant="Variant.Outlined"
+                               Disabled="@_isSubmitting"
+                               OnClick="BackToDetails">
+                        Back
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled"
+                               Color="@(IsDestructiveAction ? Color.Error : Color.Primary)"
+                               Disabled="@_isSubmitting"
+                               OnClick="ApplyActionAsync">
+                        @if (_isSubmitting)
+                        {
+                            <MudProgressCircular Size="Size.Small"
+                                                 Indeterminate="true"
+                                                 Color="Color.Inherit"
+                                                 Class="mr-2" />
+                            <span>Processing…</span>
+                        }
+                        else
+                        {
+                            <span>Confirm @_pendingAction</span>
+                        }
+                    </MudButton>
+                </div>
+            }
+        </div>
+    </DialogContent>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public string UserId { get; set; } = string.Empty;
+
+    private UserRecord? _user;
+    private bool _isLoading = true;
+    private bool _isSubmitting;
+    private string? _loadError;
+    private string? _actionError;
+    private string? _pendingAction;
+    private string _reason = string.Empty;
+
+    private bool IsDestructiveAction => _pendingAction is "reject" or "block";
+
+    private string ActionHeading => _pendingAction switch
+    {
+        "approve" => "Approve registration",
+        "reject" => "Reject registration",
+        "block" => "Block account",
+        "unblock" => "Unblock account",
+        _ => "Confirm action"
+    };
+
+    private string ActionExplanation => _pendingAction switch
+    {
+        "approve" => "The user will become ACTIVE and gain access according to their role.",
+        "reject" => "The registration will become REJECTED. Rejected accounts cannot sign in.",
+        "block" => "The account will become BLOCKED and immediately lose access to protected endpoints.",
+        "unblock" => "The blocked account will return to ACTIVE status.",
+        _ => string.Empty
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUserAsync();
+    }
+
+    private async Task LoadUserAsync()
+    {
+        _isLoading = true;
+        _loadError = null;
+
+        try
+        {
+            var result = await UserApi.GetAdminUserByIdAsync(UserId);
+            if (result.IsSuccess && result.Data is not null)
+            {
+                _user = result.Data;
+            }
+            else
+            {
+                _loadError = result.StatusCode switch
+                {
+                    403 => "You do not have administrator permission to view this account.",
+                    404 => "This user account was not found.",
+                    _ => result.ErrorMessage ?? "Could not load user details."
+                };
+            }
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void StartAction(string action)
+    {
+        _actionError = null;
+        _reason = string.Empty;
+        _pendingAction = action;
+    }
+
+    private void BackToDetails()
+    {
+        if (_isSubmitting) return;
+        _actionError = null;
+        _pendingAction = null;
+    }
+
+    private void Close()
+    {
+        if (!_isSubmitting)
+            MudDialog.Cancel();
+    }
+
+    private async Task ApplyActionAsync()
+    {
+        if (_isSubmitting || _user is null || _pendingAction is null) return;
+
+        if (_reason.Trim().Length > 500)
+        {
+            _actionError = "Reason must not exceed 500 characters.";
+            return;
+        }
+
+        _isSubmitting = true;
+        _actionError = null;
+
+        try
+        {
+            var result = _pendingAction switch
+            {
+                "approve" => await UserApi.ApproveUserAsync(_user.Id),
+                "reject" => await UserApi.RejectUserAsync(_user.Id, _reason),
+                "block" => await UserApi.ChangeUserStatusAsync(_user.Id, "BLOCKED", _reason),
+                "unblock" => await UserApi.ChangeUserStatusAsync(_user.Id, "ACTIVE", _reason),
+                _ => ApiResult<UserRecord>.Fail("Unsupported action.")
+            };
+
+            if (result.IsSuccess && result.Data is not null)
+            {
+                Snackbar.Add(
+                    $"{_user.FirstName} {_user.LastName}: status updated to {FormatStatus(result.Data.Status)}.",
+                    Severity.Success);
+                MudDialog.Close(DialogResult.Ok(result.Data));
+                return;
+            }
+
+            _actionError = result.StatusCode switch
+            {
+                403 => result.ErrorMessage ?? "Forbidden: ACTIVE ADMIN access is required for this operation.",
+                404 => result.ErrorMessage ?? "User account not found.",
+                409 => result.ErrorMessage ?? "This status change is not permitted (invalid transition or protected admin account).",
+                _ => result.ErrorMessage ?? "Could not apply account status change."
+            };
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private static string GetInitials(UserRecord user)
+    {
+        var f = user.FirstName?.Trim();
+        var l = user.LastName?.Trim();
+        if (!string.IsNullOrEmpty(f) && !string.IsNullOrEmpty(l))
+            return $"{char.ToUpperInvariant(f[0])}{char.ToUpperInvariant(l[0])}";
+        return !string.IsNullOrEmpty(user.Email) ? char.ToUpperInvariant(user.Email[0]).ToString() : "U";
+    }
+
+    private static string FormatStatus(string status) => status switch
+    {
+        "PENDING_APPROVAL" => "Pending",
+        "ACTIVE" => "Active",
+        "REJECTED" => "Rejected",
+        "BLOCKED" => "Blocked",
+        _ => status
+    };
+
+    private static string FormatDate(DateTimeOffset? date) =>
+        date?.ToLocalTime().ToString("d MMM yyyy") ?? "—";
+}

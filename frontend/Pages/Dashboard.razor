@@ -1,0 +1,384 @@
+@page "/dashboard"
+@attribute [Authorize(Policy = "ActiveUser")]
+
+@inject AuthState Auth
+@inject UserApiService UserApi
+@inject IDialogService DialogService 
+
+<PageTitle>Overview · Worksync</PageTitle>
+
+<MudStack Spacing="4">
+    <div class="d-flex justify-space-between align-start flex-wrap gap-3">
+        <div>
+            <p class="ws-eyebrow">@(Auth.IsActiveAdmin ? "Administration" : "Workspace")</p>
+            <h1 class="ws-page-title">Overview</h1>
+            <p class="ws-page-desc">
+                @(Auth.IsActiveAdmin
+                    ? "Review access requests and keep user accounts secure."
+                    : $"Welcome back, {DisplayFirstName}. Review your workspace account status.")
+            </p>
+        </div>
+
+        @if (Auth.IsActiveAdmin)
+        {
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Default"
+                       StartIcon="@Icons.Material.Outlined.Refresh"
+                       Disabled="@_isLoading"
+                       OnClick="LoadOverviewAsync">
+                @(_isLoading ? "Refreshing…" : "Refresh")
+            </MudButton>
+        }
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <MudAlert Severity="Severity.Warning" Dense="true">@_errorMessage</MudAlert>
+    }
+
+    @if (Auth.IsActiveAdmin)
+    {
+        <MudGrid Spacing="3">
+            <MudItem xs="6" md="3">
+                <div class="ws-stat-card">
+                    <div class="ws-stat-head">
+                        <span>Pending Approval</span>
+                        <span class="ws-stat-icon amber">
+                            <MudIcon Icon="@Icons.Material.Outlined.Schedule" Size="Size.Small" />
+                        </span>
+                    </div>
+                    <div class="ws-stat-value">@(_isLoading ? "—" : _pendingCount.ToString())</div>
+                </div>
+            </MudItem>
+
+            <MudItem xs="6" md="3">
+                <div class="ws-stat-card">
+                    <div class="ws-stat-head">
+                        <span>Active Accounts</span>
+                        <span class="ws-stat-icon green">
+                            <MudIcon Icon="@Icons.Material.Outlined.HowToReg" Size="Size.Small" />
+                        </span>
+                    </div>
+                    <div class="ws-stat-value">@(_isLoading ? "—" : _activeCount.ToString())</div>
+                </div>
+            </MudItem>
+
+            <MudItem xs="6" md="3">
+                <div class="ws-stat-card">
+                    <div class="ws-stat-head">
+                        <span>Rejected Accounts</span>
+                        <span class="ws-stat-icon red">
+                            <MudIcon Icon="@Icons.Material.Outlined.Close" Size="Size.Small" />
+                        </span>
+                    </div>
+                    <div class="ws-stat-value">@(_isLoading ? "—" : _rejectedCount.ToString())</div>
+                </div>
+            </MudItem>
+
+            <MudItem xs="6" md="3">
+                <div class="ws-stat-card">
+                    <div class="ws-stat-head">
+                        <span>Blocked Accounts</span>
+                        <span class="ws-stat-icon indigo">
+                            <MudIcon Icon="@Icons.Material.Outlined.Block" Size="Size.Small" />
+                        </span>
+                    </div>
+                    <div class="ws-stat-value">@(_isLoading ? "—" : _blockedCount.ToString())</div>
+                </div>
+            </MudItem>
+        </MudGrid>
+
+        <MudGrid Spacing="3">
+            <MudItem xs="12" lg="8">
+                <section class="ws-panel">
+                    <div class="ws-panel-header">
+                        <div>
+                            <h2>Pending registrations</h2>
+                            <p>Review the most recent requests for access.</p>
+                        </div>
+                        <MudButton Variant="Variant.Outlined"
+                                   Size="Size.Small"
+                                   EndIcon="@Icons.Material.Rounded.ArrowForward"
+                                   Href="/admin/approvals">
+                            View All
+                        </MudButton>
+                    </div>
+
+                    @if (_isLoading)
+                    {
+                        <div class="pa-8 d-flex justify-center">
+                            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+                        </div>
+                    }
+                    else if (_pendingUsers.Count == 0)
+                    {
+                        <div class="ws-empty">
+                            <MudIcon Icon="@Icons.Material.Outlined.CheckCircleOutline" Size="Size.Large" Color="Color.Success" />
+                            <h3>All caught up</h3>
+                            <p>There are no pending registration requests.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="ws-table-wrap">
+                            <table class="ws-table">
+                                <thead>
+                                    <tr>
+                                        <th>Applicant</th>
+                                        <th>Registered</th>
+                                        <th>Status</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var user in _pendingUsers)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <div class="ws-person">
+                                                    <div class="ws-avatar">@GetInitials(user)</div>
+                                                    <div>
+                                                        <span class="ws-person-name">@($"{user.FirstName} {user.LastName}".Trim())</span>
+                                                        <span class="ws-person-email">@user.Email</span>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>@FormatDate(user.CreatedAt)</td>
+                                            <td>
+                                                <span class="ws-status-pill @user.Status">@FormatStatus(user.Status)</span>
+                                            </td>
+                                            <td class="text-right">
+                                                <MudButton Variant="Variant.Filled"
+                                                           Size="Size.Small"
+                                                           Color="Color.Primary"
+                                                           OnClick="@(() => OpenReviewDialogAsync(user.Id))">
+                                                    Review
+                                                </MudButton>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </section>
+            </MudItem>
+
+            <MudItem xs="12" lg="4">
+                <section class="ws-panel pa-5">
+                    <div class="mb-4">
+                        <h2 style="font-size: 1rem; font-weight: 700; margin: 0 0 2px;">Quick actions</h2>
+                        <p style="font-size: 0.8rem; color: #64748B; margin: 0;">Common account-administration tasks</p>
+                    </div>
+
+                    <div class="ws-hint-card">
+                        <strong>Account approval matters</strong>
+                        <p>Only approved accounts can access protected WorkSync features. Review details before making a decision.</p>
+                    </div>
+
+                    <div class="ws-tip">
+                        <span class="ws-tip-icon">
+                            <MudIcon Icon="@Icons.Material.Outlined.HowToReg" Size="Size.Small" />
+                        </span>
+                        <div>
+                            <strong style="font-size: 0.82rem; display: block;">Review pending accounts</strong>
+                            <p style="font-size: 0.76rem; color: #64748B; margin: 3px 0 8px;">
+                                Approve or reject registration requests.
+                            </p>
+                            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" Href="/admin/approvals">
+                                Open queue
+                            </MudButton>
+                        </div>
+                    </div>
+
+                    <div class="ws-tip">
+                        <span class="ws-tip-icon">
+                            <MudIcon Icon="@Icons.Material.Outlined.Group" Size="Size.Small" />
+                        </span>
+                        <div>
+                            <strong style="font-size: 0.82rem; display: block;">Manage user access</strong>
+                            <p style="font-size: 0.76rem; color: #64748B; margin: 3px 0 8px;">
+                                Inspect accounts, block or unblock users.
+                            </p>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Default" Size="Size.Small" Href="/admin/users">
+                                Browse users
+                            </MudButton>
+                        </div>
+                    </div>
+                </section>
+            </MudItem>
+        </MudGrid>
+    }
+    else
+    {
+        <MudGrid Spacing="3">
+            <MudItem xs="12" md="7">
+                <section class="ws-panel pa-6">
+                    <div class="d-flex justify-space-between align-center mb-4">
+                        <h2 style="font-size: 1.05rem; font-weight: 700; margin: 0;">Account details</h2>
+                        <span class="ws-status-pill @(CurrentUser?.Status ?? "ACTIVE")">
+                            @FormatStatus(CurrentUser?.Status ?? "ACTIVE")
+                        </span>
+                    </div>
+
+                    <MudStack Spacing="2" Class="mb-5">
+                        <MudText Typo="Typo.body2">
+                            <strong>Full name:</strong> @($"{CurrentUser?.FirstName} {CurrentUser?.LastName}".Trim())
+                        </MudText>
+                        <MudText Typo="Typo.body2">
+                            <strong>Email:</strong> @CurrentUser?.Email
+                        </MudText>
+                        <MudText Typo="Typo.body2">
+                            <strong>Phone number:</strong> @CurrentUser?.PhoneNumber
+                        </MudText>
+                        <MudText Typo="Typo.body2">
+                            <strong>System role:</strong> @(CurrentUser?.Role ?? "USER")
+                        </MudText>
+                        <MudText Typo="Typo.body2">
+                            <strong>Registered:</strong> @FormatDate(CurrentUser?.CreatedAt)
+                        </MudText>
+                    </MudStack>
+
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Outlined.PersonOutline"
+                               Href="/profile">
+                        Manage my profile
+                    </MudButton>
+                </section>
+            </MudItem>
+        </MudGrid>
+    }
+</MudStack>
+
+@code {
+    private UserRecord? _profile;
+    private List<UserRecord> _pendingUsers = new();
+    private long _pendingCount;
+    private long _activeCount;
+    private long _rejectedCount;
+    private long _blockedCount;
+    private bool _isLoading;
+    private string? _errorMessage;
+
+    private UserRecord? CurrentUser => _profile ?? Auth.User;
+
+    private string DisplayFirstName =>
+        string.IsNullOrWhiteSpace(CurrentUser?.FirstName) ? "back" : CurrentUser!.FirstName;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _profile = Auth.User;
+        await LoadOverviewAsync();
+    }
+
+    private async Task LoadOverviewAsync()
+    {
+        if (_isLoading) return;
+
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var profileTask = UserApi.GetMyProfileAsync();
+
+            if (Auth.IsActiveAdmin)
+            {
+                var pendingTask = UserApi.GetAdminUsersAsync("PENDING_APPROVAL", page: 0, size: 5);
+                var activeTask = UserApi.GetAdminUsersAsync("ACTIVE", page: 0, size: 1);
+                var rejectedTask = UserApi.GetAdminUsersAsync("REJECTED", page: 0, size: 1);
+                var blockedTask = UserApi.GetAdminUsersAsync("BLOCKED", page: 0, size: 1);
+
+                await Task.WhenAll(profileTask, pendingTask, activeTask, rejectedTask, blockedTask);
+
+                var pendingRes = pendingTask.Result;
+                var activeRes = activeTask.Result;
+                var rejectedRes = rejectedTask.Result;
+                var blockedRes = blockedTask.Result;
+
+                if (pendingRes.IsSuccess && pendingRes.Data is not null)
+                {
+                    _pendingUsers = pendingRes.Data.Content;
+                    _pendingCount = pendingRes.Data.TotalElements;
+                }
+                else
+                {
+                    _errorMessage = pendingRes.ErrorMessage ?? "Could not load overview metrics.";
+                }
+
+                if (activeRes.IsSuccess && activeRes.Data is not null)
+                    _activeCount = activeRes.Data.TotalElements;
+
+                if (rejectedRes.IsSuccess && rejectedRes.Data is not null)
+                    _rejectedCount = rejectedRes.Data.TotalElements;
+
+                if (blockedRes.IsSuccess && blockedRes.Data is not null)
+                    _blockedCount = blockedRes.Data.TotalElements;
+            }
+            else
+            {
+                await profileTask;
+            }
+
+            if (profileTask.Result.IsSuccess && profileTask.Result.Data is not null)
+            {
+                _profile = profileTask.Result.Data;
+                await Auth.UpdateUserAsync(profileTask.Result.Data);
+            }
+            else if (!Auth.IsActiveAdmin && profileTask.Result.StatusCode != 401)
+            {
+                _errorMessage = profileTask.Result.ErrorMessage ?? "Could not refresh profile details.";
+            }
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+    private async Task OpenReviewDialogAsync(string userId)
+{
+    var parameters = new DialogParameters<UserReviewDialog>
+    {
+        { x => x.UserId, userId }
+    };
+
+    var options = new DialogOptions
+    {
+        NoHeader = true,
+        MaxWidth = MaxWidth.Small,
+        FullWidth = true,
+        CloseOnEscapeKey = true,
+        BackdropClick = true,
+        BackgroundClass = "logout-dialog-backdrop"
+    };
+
+    var dialog = await DialogService.ShowAsync<UserReviewDialog>(string.Empty, parameters, options);
+    var result = await dialog.Result;
+    if (result is not null && !result.Canceled)
+    {
+        await LoadOverviewAsync();
+    }
+}
+
+    private static string GetInitials(UserRecord user)
+    {
+        var f = user.FirstName?.Trim();
+        var l = user.LastName?.Trim();
+        if (!string.IsNullOrEmpty(f) && !string.IsNullOrEmpty(l))
+            return $"{char.ToUpperInvariant(f[0])}{char.ToUpperInvariant(l[0])}";
+        return !string.IsNullOrEmpty(user.Email) ? char.ToUpperInvariant(user.Email[0]).ToString() : "U";
+    }
+
+    private static string FormatStatus(string status) => status switch
+    {
+        "PENDING_APPROVAL" => "Pending",
+        "ACTIVE" => "Active",
+        "REJECTED" => "Rejected",
+        "BLOCKED" => "Blocked",
+        _ => status
+    };
+
+    private static string FormatDate(DateTimeOffset? date) =>
+        date?.ToLocalTime().ToString("d MMM yyyy") ?? "—";
+}
