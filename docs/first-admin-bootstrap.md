@@ -56,17 +56,20 @@ changes those controls nor bypasses them.
 Do not configure this as the Render start/build/pre-deploy command. It is a separate one-time action.
 No permanent ADMIN_* environment variables or enabled startup profile are required or supported.
 
-1. Deploy the reviewed JAR and normal database migrations. Confirm the service uses the intended
+1. Render currently deploys from `chore/render-backend`. This feature branch is for review only;
+   deployment requires a separately authorized integration into that deployment branch.
+   Deploy the reviewed JAR and normal database migrations. Confirm the service uses the intended
    production database. Do not infer this merely from a database name or the public API hostname.
 2. Open the backend service's interactive shell/SSH session. Confirm the three required database
    variables exist using the Render environment settings; do not echo their values into the terminal.
-3. Locate the packaged backend JAR. For the standard Maven layout, from `backend/` it is
-   `target/worksync-0.0.1-SNAPSHOT.jar`. A container might rename it to `/app/app.jar`; use the actual
-   deployed artifact path. Do not use the `.jar.original` archive.
-4. Set the non-secret artifact-path variable and run the exact command below. Adjust only that path:
+3. The preserved Render `backend/Dockerfile` packages with Java 21 and copies the executable
+   JAR to `/app/app.jar` in its Java 21 runtime image. Use that path in Render Shell. For a
+   non-container Maven build, the alternative from `backend/` is
+   `target/worksync-0.0.1-SNAPSHOT.jar`. Do not use the `.jar.original` archive.
+4. Run this exact Render-container command; it does not replace the normal service start command:
 
 ```bash
-WORKSYNC_BOOTSTRAP_JAR=target/worksync-0.0.1-SNAPSHOT.jar
+WORKSYNC_BOOTSTRAP_JAR=/app/app.jar
 java -Dloader.main=com.eclectics.worksync.users.bootstrap.FirstAdminBootstrap \
   -cp "$WORKSYNC_BOOTSTRAP_JAR" \
   org.springframework.boot.loader.launch.PropertiesLauncher --create-first-admin
