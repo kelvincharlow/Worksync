@@ -1,0 +1,63 @@
+
+@using MudBlazor
+
+<MudGrid Spacing="3">
+    <MudItem xs="6" md="3">
+        <div class="ws-stat-card">
+            <div class="ws-stat-head">
+                <span>Pending Approval</span>
+                <span class="ws-stat-icon amber">
+                    <MudIcon Icon="@Icons.Material.Outlined.Schedule" Size="Size.Small" />
+                </span>
+            </div>
+            <div class="ws-stat-value">@DisplayCount(PendingCount)</div>
+        </div>
+    </MudItem>
+
+    <MudItem xs="6" md="3">
+        <div class="ws-stat-card">
+            <div class="ws-stat-head">
+                <span>Active Accounts</span>
+                <span class="ws-stat-icon green">
+                    <MudIcon Icon="@Icons.Material.Outlined.HowToReg" Size="Size.Small" />
+                </span>
+            </div>
+            <div class="ws-stat-value">@DisplayCount(ActiveCount)</div>
+        </div>
+    </MudItem>
+
+    <MudItem xs="6" md="3">
+        <div class="ws-stat-card">
+            <div class="ws-stat-head">
+                <span>Rejected Accounts</span>
+                <span class="ws-stat-icon red">
+                    <MudIcon Icon="@Icons.Material.Outlined.Close" Size="Size.Small" />
+                </span>
+            </div>
+            <div class="ws-stat-value">@DisplayCount(RejectedCount)</div>
+        </div>
+    </MudItem>
+
+    <MudItem xs="6" md="3">
+        <div class="ws-stat-card">
+            <div class="ws-stat-head">
+                <span>Blocked Accounts</span>
+                <span class="ws-stat-icon indigo">
+                    <MudIcon Icon="@Icons.Material.Outlined.Block" Size="Size.Small" />
+                </span>
+            </div>
+            <div class="ws-stat-value">@DisplayCount(BlockedCount)</div>
+        </div>
+    </MudItem>
+</MudGrid>
+
+@code {
+    [Parameter] public bool IsLoading { get; set; }
+    [Parameter] public long PendingCount { get; set; }
+    [Parameter] public long ActiveCount { get; set; }
+    [Parameter] public long RejectedCount { get; set; }
+    [Parameter] public long BlockedCount { get; set; }
+
+    private string DisplayCount(long count) =>
+        IsLoading ? "—" : count.ToString();
+}

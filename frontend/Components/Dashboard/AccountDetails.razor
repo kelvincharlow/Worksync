@@ -1,0 +1,65 @@
+
+@using Worksync.Frontend.Models.Shared
+@using MudBlazor
+
+<MudGrid Spacing="3">
+    <MudItem xs="12" md="7">
+        <section class="ws-panel pa-6">
+            <div class="d-flex justify-space-between align-center mb-4">
+                <h2 style="font-size: 1.05rem; font-weight: 700; margin: 0;">
+                    Account details
+                </h2>
+
+                <span class="ws-status-pill @(User?.Status ?? "ACTIVE")">
+                    @FormatStatus(User?.Status ?? "ACTIVE")
+                </span>
+            </div>
+
+            <MudStack Spacing="2" Class="mb-5">
+                <MudText Typo="Typo.body2">
+                    <strong>Full name:</strong>
+                    @($"{User?.FirstName} {User?.LastName}".Trim())
+                </MudText>
+
+                <MudText Typo="Typo.body2">
+                    <strong>Email:</strong> @User?.Email
+                </MudText>
+
+                <MudText Typo="Typo.body2">
+                    <strong>Phone number:</strong> @User?.PhoneNumber
+                </MudText>
+
+                <MudText Typo="Typo.body2">
+                    <strong>System role:</strong> @(User?.Role ?? "USER")
+                </MudText>
+
+                <MudText Typo="Typo.body2">
+                    <strong>Registered:</strong> @FormatDate(User?.CreatedAt)
+                </MudText>
+            </MudStack>
+
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Outlined.PersonOutline"
+                       Href="/profile">
+                Manage my profile
+            </MudButton>
+        </section>
+    </MudItem>
+</MudGrid>
+
+@code {
+    [Parameter] public UserRecord? User { get; set; }
+
+    private static string FormatStatus(string status) => status switch
+    {
+        "PENDING_APPROVAL" => "Pending",
+        "ACTIVE" => "Active",
+        "REJECTED" => "Rejected",
+        "BLOCKED" => "Blocked",
+        _ => status
+    };
+
+    private static string FormatDate(DateTimeOffset? date) =>
+        date?.ToLocalTime().ToString("d MMM yyyy") ?? "—";
+}
