@@ -82,19 +82,25 @@ public class AuthSessionService
         }
     }
 
+    /// <summary>
+    /// Calls POST /auth/logout if an access token is present, and always clears local auth state.
+    /// </summary>
     public async Task<ApiResult> LogoutAsync()
-{
-    await _authState.InitializeAsync();
-    var accessToken = _authState.AccessToken;
-
-    // Wipe local tokens and browser storage immediately before calling the server
-    await _authState.ClearAsync();
-
-    if (string.IsNullOrWhiteSpace(accessToken))
     {
-        return ApiResult.Ok();
-    }
+        await _authState.InitializeAsync();
 
-    return await _authApi.LogoutAsync(accessToken);
-}
+        ApiResult result;
+        try
+        {
+            result = string.IsNullOrWhiteSpace(_authState.AccessToken)
+                ? ApiResult.Ok()
+                : await _authApi.LogoutAsync();
+        }
+        finally
+        {
+            await _authState.ClearAsync();
+        }
+
+        return result;
+    }
 }

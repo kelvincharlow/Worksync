@@ -16,11 +16,7 @@
 *.iml
 .DS_Store
 *.log
-<<<<<<< HEAD
 
 # Vercel frontend build artifacts
-=======
-#vercel 
->>>>>>> front-end-setup
 frontend/.dotnet/
 frontend/publish/
