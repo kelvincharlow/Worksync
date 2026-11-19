@@ -1,0 +1,118 @@
+
+@using Worksync.Frontend.Models.Shared
+@using MudBlazor
+
+<section class="ws-panel">
+    <div class="ws-panel-header">
+        <div>
+            <h2>Pending registrations</h2>
+            <p>Review the most recent requests for access.</p>
+        </div>
+
+        <MudButton Variant="Variant.Outlined"
+                   Size="Size.Small"
+                   EndIcon="@Icons.Material.Rounded.ArrowForward"
+                   Href="/admin/approvals">
+            View All
+        </MudButton>
+    </div>
+
+    @if (IsLoading)
+    {
+        <div class="pa-8 d-flex justify-center">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+        </div>
+    }
+    else if (Users.Count == 0)
+    {
+        <div class="ws-empty">
+            <MudIcon Icon="@Icons.Material.Outlined.CheckCircleOutline"
+                     Size="Size.Large"
+                     Color="Color.Success" />
+            <h3>All caught up</h3>
+            <p>There are no pending registration requests.</p>
+        </div>
+    }
+    else
+    {
+        <div class="ws-table-wrap">
+            <table class="ws-table">
+                <thead>
+                    <tr>
+                        <th>Applicant</th>
+                        <th>Registered</th>
+                        <th>Status</th>
+                        <th></th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @foreach (var user in Users)
+                    {
+                        <tr>
+                            <td>
+                                <div class="ws-person">
+                                    <div class="ws-avatar">@GetInitials(user)</div>
+                                    <div>
+                                        <span class="ws-person-name">
+                                            @($"{user.FirstName} {user.LastName}".Trim())
+                                        </span>
+                                        <span class="ws-person-email">@user.Email</span>
+                                    </div>
+                                </div>
+                            </td>
+
+                            <td>@FormatDate(user.CreatedAt)</td>
+
+                            <td>
+                                <span class="ws-status-pill @user.Status">
+                                    @FormatStatus(user.Status)
+                                </span>
+                            </td>
+
+                            <td class="text-right">
+                                <MudButton Variant="Variant.Filled"
+                                           Size="Size.Small"
+                                           Color="Color.Primary"
+                                           OnClick="@(() => ReviewRequested.InvokeAsync(user.Id))">
+                                    Review
+                                </MudButton>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter] public List<UserRecord> Users { get; set; } = new();
+    [Parameter] public bool IsLoading { get; set; }
+    [Parameter] public EventCallback<string> ReviewRequested { get; set; }
+
+    private static string GetInitials(UserRecord user)
+    {
+        var first = user.FirstName?.Trim();
+        var last = user.LastName?.Trim();
+
+        if (!string.IsNullOrEmpty(first) && !string.IsNullOrEmpty(last))
+            return $"{char.ToUpperInvariant(first[0])}{char.ToUpperInvariant(last[0])}";
+
+        return !string.IsNullOrEmpty(user.Email)
+            ? char.ToUpperInvariant(user.Email[0]).ToString()
+            : "U";
+    }
+
+    private static string FormatStatus(string status) => status switch
+    {
+        "PENDING_APPROVAL" => "Pending",
+        "ACTIVE" => "Active",
+        "REJECTED" => "Rejected",
+        "BLOCKED" => "Blocked",
+        _ => status
+    };
+
+    private static string FormatDate(DateTimeOffset? date) =>
+        date?.ToLocalTime().ToString("d MMM yyyy") ?? "—";
+}

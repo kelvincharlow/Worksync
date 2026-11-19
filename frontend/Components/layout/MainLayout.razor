@@ -106,8 +106,8 @@
                 <Authorized>
                     <div class="d-flex align-center gap-3">
                         <MudHidden Breakpoint="Breakpoint.SmAndDown">
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                @(Auth.IsActiveAdmin ? "Administrator workspace" : "Member workspace")
+                            <MudText Typo="Typo.body2" Style="color: #334155;">
+                            <strong style="color: #16A34A; font-weight: 700;">Jambo</strong>, @DisplayName
                             </MudText>
                         </MudHidden>
                         <a href="/profile" class="ws-top-avatar" title="View my profile">@Initials</a>

@@ -28,7 +28,7 @@ public class AuthState
     public bool IsAccessTokenValid =>
         !string.IsNullOrWhiteSpace(AccessToken)
         && ExpiresAt.HasValue
-        && ExpiresAt.Value > DateTimeOffset.UtcNow.AddSeconds(15);
+        && ExpiresAt.Value > DateTimeOffset.UtcNow.AddSeconds(5);
 
     public bool IsAuthenticated =>
         (!string.IsNullOrWhiteSpace(AccessToken) && ExpiresAt > DateTimeOffset.UtcNow)
@@ -123,15 +123,19 @@ public class AuthState
     }
 
     private async Task ClearStorageSafelyAsync()
+{
+    try
     {
-        try
-        {
-            await _js.InvokeVoidAsync("sessionStorage.removeItem", StorageKey);
-        }
-        catch
-        {
-            // Ignore storage clear failure
-        }
+        await _js.InvokeVoidAsync("sessionStorage.removeItem", StorageKey);
+        await _js.InvokeVoidAsync("sessionStorage.removeItem", "accessToken");
+        await _js.InvokeVoidAsync("sessionStorage.removeItem", "refreshToken");
+        await _js.InvokeVoidAsync("localStorage.removeItem", "accessToken");
+        await _js.InvokeVoidAsync("localStorage.removeItem", "refreshToken");
+    }
+    catch
+    {
+        // Ignore storage clear failure
+    }
     }
 
     private sealed record SessionSnapshot(
