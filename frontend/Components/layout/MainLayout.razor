@@ -15,8 +15,9 @@
                        Variant="DrawerVariant.Responsive"
                        Elevation="0"
                        Class="ws-sidebar">
+
                 <div class="ws-sidebar-inner">
-                                       <div class="ws-logo-area">
+                    <div class="ws-logo-area">
                         <a href="/dashboard" class="d-flex align-center">
                             <img src="/images/logo.png" alt="WorkSync" class="ws-sidebar-logo" />
                         </a>
@@ -52,15 +53,7 @@
                             </NavLink>
                         }
                     </div>
-
-                    <div class="ws-side-bottom">
-                        <div class="ws-user-chip">
-                            <div class="ws-avatar">@Initials</div>
-                            <div class="ws-user-who">
-                                <strong>@DisplayName</strong>
-                                <small>@(Auth.IsActiveAdmin ? "System Administrator" : Auth.User?.Role ?? "Member")</small>
-                            </div>
-                        </div>
+                    <div class="ws-side-bottom">                   
 
                         <NavLink href="/profile" Match="NavLinkMatch.All" class="ws-nav-link">
                             <MudIcon Icon="@Icons.Material.Outlined.PersonOutline" Size="Size.Small" />
@@ -111,14 +104,6 @@
 @code {
     private bool _drawerOpen = true;
 
-    private string DisplayName
-    {
-        get
-        {
-            var full = $"{Auth.User?.FirstName} {Auth.User?.LastName}".Trim();
-            return string.IsNullOrWhiteSpace(full) ? (Auth.User?.Email ?? "Account") : full;
-        }
-    }
     private string GreetingName
 {
     get
@@ -131,37 +116,6 @@
     }
 }
 
-    private string Initials
-    {
-        get
-        {
-            var f = Auth.User?.FirstName?.Trim();
-            var l = Auth.User?.LastName?.Trim();
-            if (!string.IsNullOrEmpty(f) && !string.IsNullOrEmpty(l))
-                return $"{char.ToUpperInvariant(f[0])}{char.ToUpperInvariant(l[0])}";
-            var email = Auth.User?.Email?.Trim();
-            return !string.IsNullOrEmpty(email) ? char.ToUpperInvariant(email[0]).ToString() : "W";
-        }
-    }
-
-    private string CurrentRoute => Navigation.ToBaseRelativePath(Navigation.Uri)
-        .Split('?', '#')[0]
-        .Trim('/')
-        .ToLowerInvariant();
-
-    private string SectionName => CurrentRoute.StartsWith("admin") ? "Administration"
-        : CurrentRoute == "profile" ? "My Account"
-        : "Workspace";
-
-    private string PageTitleText => CurrentRoute switch
-    {
-        "dashboard" => "Overview",
-        "admin/approvals" => "Approvals",
-        "admin/users" => "User Management",
-        "profile" => "My Profile",
-        "pending-approval" => "Approval Status",
-        _ => "WorkSync"
-    };
 
     protected override async Task OnInitializedAsync()
     {

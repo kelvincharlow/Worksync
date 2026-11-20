@@ -1,0 +1,180 @@
+@page "/profile"
+@namespace Worksync.Frontend.Pages
+@attribute [Authorize]
+
+<PageTitle>My Profile </PageTitle>
+
+<MudStack Spacing="4">
+    <div>
+        <p class="ws-eyebrow">My Account</p>
+        <h1 class="ws-page-title">My Profile</h1>
+        <p class="ws-page-desc">Review and update your personal WorkSync account details.</p>
+    </div>
+
+    <MudGrid Spacing="3">
+        <MudItem xs="12" lg="8">
+            <section class="ws-panel pa-6">
+                <div class="d-flex align-center gap-4 mb-6 flex-wrap">
+
+                    @* <div class="ws-profile-avatar">
+                        @GetInitials()
+                    </div> *@
+
+                    <div>
+                        <h2 style="font-size: 1.2rem; font-weight: 700; margin: 0 0 2px;">
+                            @GetFullName()
+                        </h2>
+
+                        <p style="font-size: 0.84rem; color: #64748B; margin: 0 0 8px;">
+                            @_profile?.Email
+                        </p>
+
+                        <div class="d-flex align-center gap-2 flex-wrap">
+                            <span class="ws-status-pill @(_profile?.Status ?? "PENDING_APPROVAL")">
+                                @(_profile?.Status ?? "PENDING_APPROVAL")
+                            </span>
+
+                            <span class="ws-pill">
+                                @(_profile?.Role ?? "USER")
+                            </span>
+                        </div>
+                    </div>
+
+                </div>
+                @if (!string.IsNullOrWhiteSpace(_errorMessage))
+                {
+                    <MudAlert Severity="Severity.Error" Dense="true" Class="mb-4">@_errorMessage</MudAlert>
+                }
+
+                <EditForm EditContext="@_editContext" OnValidSubmit="SaveProfileAsync">
+                    <DataAnnotationsValidator />
+
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" sm="6">
+                            <div class="ws-profile-field">
+                                <label for="profile-first-name">First name</label>
+                                <InputText id="profile-first-name"
+                                           class="ws-profile-input"
+                                           @bind-Value="_model.FirstName"
+                                           disabled="@(!_isEditing || _isSaving)" />
+                                <ValidationMessage For="@(() => _model.FirstName)" />
+                            </div>
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <div class="ws-profile-field">
+                                <label for="profile-last-name">Last name</label>
+                                <InputText id="profile-last-name"
+                                           class="ws-profile-input"
+                                           @bind-Value="_model.LastName"
+                                           disabled="@(!_isEditing || _isSaving)" />
+                                <ValidationMessage For="@(() => _model.LastName)" />
+                            </div>
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <div class="ws-profile-field">
+                                <label for="profile-phone">Phone number</label>
+                                <InputText id="profile-phone"
+                                           type="tel"
+                                           class="ws-profile-input"
+                                           @bind-Value="_model.PhoneNumber"
+                                           disabled="@(!_isEditing || _isSaving)" />
+                                @* <span class="auth-hint">Use international E.164 format, e.g. +254712345678.</span> *@
+                                <ValidationMessage For="@(() => _model.PhoneNumber)" />
+                            </div>
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <div class="ws-profile-field">
+                                <label for="profile-email">Email address</label>
+                                <input id="profile-email"
+                                       class="ws-profile-input"
+                                       value="@_profile?.Email"
+                                       disabled />
+                                @* <span class="auth-hint">Email changes are not supported in the current profile API.</span> *@
+                            </div>
+                        </MudItem>
+                    </MudGrid>
+
+                    <div class="d-flex justify-end gap-2 mt-6">
+                        @if (_isEditing)
+                        {
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Default"
+                                       Disabled="@_isSaving"
+                                       OnClick="CancelEditing">
+                                Cancel
+                            </MudButton>
+                            <MudButton ButtonType="ButtonType.Submit"
+                                       Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Outlined.Check"
+                                       Disabled="@_isSaving">
+                                @(_isSaving ? "Saving…" : "Save changes")
+                            </MudButton>
+                        }
+                        else
+                        {
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Outlined.Edit"
+                                       OnClick="StartEditing">
+                                Edit profile
+                            </MudButton>
+                        }
+                    </div>
+                </EditForm>
+            </section>
+        </MudItem>
+
+        <MudItem xs="12" lg="4">
+            <aside class="ws-panel pa-6">
+                <h2 style="font-size: 1rem; font-weight: 700; margin: 0 0 4px;">Account information</h2>
+                <p style="font-size: 0.8rem; color: #64748B; margin: 0 0 14px;">
+                    Your access and identity details.
+                </p>
+
+                <div class="ws-info-row">
+                    <MudIcon Icon="@Icons.Material.Outlined.VerifiedUser" Size="Size.Small" Color="Color.Primary" />
+                    <div>
+                        <strong>System role</strong>
+                        <span>@(_profile?.Role ?? "USER") · Managed by WorkSync</span>
+                    </div>
+                </div>
+
+                <div class="ws-info-row">
+                    <MudIcon Icon="@Icons.Material.Outlined.CheckCircleOutline" Size="Size.Small" Color="Color.Success" />
+                    <div>
+                        <strong>Account status</strong>
+                        <span>@(_profile?.Status ?? "PENDING_APPROVAL")</span>
+                    </div>
+                </div>
+
+                <div class="ws-info-row">
+                    <MudIcon Icon="@Icons.Material.Outlined.CalendarToday" Size="Size.Small" Color="Color.Default" />
+                    <div>
+                        <strong>Registered</strong>
+                        <span>@(_profile?.CreatedAt?.ToString("dd MMM yyyy") ?? "—")</span>
+                    </div>
+                </div>
+
+                <div class="ws-info-row">
+                    <MudIcon Icon="@Icons.Material.Outlined.Update" Size="Size.Small" Color="Color.Default" />
+                    <div>
+                        <strong>Last updated</strong>
+                        <span>@(_profile?.UpdatedAt?.ToString("dd MMM yyyy") ?? "—")</span>
+                    </div>
+                </div>
+
+                <div class="ws-info-row">
+                    <MudIcon Icon="@Icons.Material.Outlined.Info" Size="Size.Small" Color="Color.Default" />
+                    <div>
+                        <strong>Security boundary</strong>
+                        <span>Role, email, and account status cannot be edited through your profile.</span>
+                    </div>
+                </div>
+            </aside>
+        </MudItem>
+    </MudGrid>
+</MudStack>
