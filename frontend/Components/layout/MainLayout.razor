@@ -76,45 +76,30 @@
             </MudDrawer>
         </Authorized>
     </AuthorizeView>
+<MudAppBar Elevation="0"
+           Class="ws-topbar"
+           Style="height: 72px; justify-content: flex-start;">
 
-    <MudAppBar Elevation="0" Class="ws-topbar" Style="height: 72px; justify-content: center;">
-        <div class="d-flex align-center justify-space-between w-100 px-2">
-            <div class="ws-breadcrumb">
-                <AuthorizeView>
-                    <Authorized>
-                        <MudIconButton Icon="@Icons.Material.Filled.Menu"
-                                       Color="Color.Inherit"
-                                       Edge="Edge.Start"
-                                       aria-label="Toggle navigation menu"
-                                       OnClick="ToggleDrawer"
-                                       Class="d-md-none mr-1" />
-                    </Authorized>
-                </AuthorizeView>
+    <AuthorizeView>
+        <Authorized>
+            <div class="d-flex align-center w-100 px-2">
 
-                <span>WorkSync</span>
-                <MudIcon Icon="@Icons.Material.Rounded.ChevronRight" Size="Size.Small" />
-                <span>@SectionName</span>
-                <MudIcon Icon="@Icons.Material.Rounded.ChevronRight" Size="Size.Small" />
-                <strong>@PageTitleText</strong>
+                <MudIconButton Icon="@Icons.Material.Filled.Menu"
+                               Color="Color.Inherit"
+                               Edge="Edge.Start"
+                               aria-label="Toggle navigation menu"
+                               OnClick="ToggleDrawer"
+                               Class="d-md-none mr-2" />
+
+                <MudText Typo="Typo.h6" Class="ws-greeting">
+                    Jambo 👋 @GreetingName
+                </MudText>
+
             </div>
+        </Authorized>
+    </AuthorizeView>
 
-            <AuthorizeView>
-                <Authorized>
-                    <div class="d-flex align-center gap-3">
-                        <MudHidden Breakpoint="Breakpoint.SmAndDown">
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                @(Auth.IsActiveAdmin ? "Administrator workspace" : "Member workspace")
-                            </MudText>
-                        </MudHidden>
-                        <a href="/profile" class="ws-top-avatar" title="View my profile">@Initials</a>
-                    </div>
-                </Authorized>
-                <NotAuthorized>
-                    <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/login">Sign in</MudButton>
-                </NotAuthorized>
-            </AuthorizeView>
-        </div>
-    </MudAppBar>
+</MudAppBar>
 
     <MudMainContent Style="background-color: #F6F8FC; min-height: 100vh;">
         <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-7 px-4 px-sm-8">
@@ -134,6 +119,17 @@
             return string.IsNullOrWhiteSpace(full) ? (Auth.User?.Email ?? "Account") : full;
         }
     }
+    private string GreetingName
+{
+    get
+    {
+        var firstName = Auth.User?.FirstName?.Trim();
+
+        return string.IsNullOrWhiteSpace(firstName)
+            ? "there"
+            : firstName;
+    }
+}
 
     private string Initials
     {
