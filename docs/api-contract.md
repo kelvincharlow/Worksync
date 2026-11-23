@@ -128,3 +128,302 @@ Expected error statuses: 400 invalid input, 401 invalid/missing/expired authenti
 Finalize JWT signing/key rotation, token lifetime, browser storage, CORS/CSRF behavior, prompt status/role/permission changes on existing tokens, and the later revocation/refresh strategy. Browser token disposal must not be presented as server-side revocation. Define secure one-time first-admin provisioning, audit logging and email normalization/uniqueness. For future endpoints, agree pagination sorting and detailed validation behavior. The implemented Users reads already use fixed ordering, and profile updates reject whitespace-only names. The supplied YAML is a draft and some operations do not yet enumerate malformed-input or blocked-token error cases; review those before implementation.
 
 Email verification, rate limiting/abuse protection, administrator MFA as appropriate, and a complete token lifecycle policy remain production-readiness work outside Users Step 5B. Password-reset code is implemented in main, with the path mismatch noted above; this step does not assess its production readiness. Email delivery failure must not roll back an otherwise successful registration or approval.
+
+## Modules 2 and 3 — V13 contract extension (planned)
+
+Source: `WorkSync_M2_M3_Implementation_Agreement_V13_Kelvin_Phoebe.docx`,
+23 November 2026, read in full. This agreement supplies contract requirements;
+its sample Git commands, Java file lists and deployment procedures are context,
+not instructions to implement modules or release them in this change.
+
+OpenAPI version **0.3.0**, specification **3.0.3**, adds Projects (M2, Kelvin) and
+Work Items/Bugs (M3, Phoebe). Every new operation has
+`x-implementation-status: planned`. Existing Module 1 paths, operations, schemas,
+error definitions and public Auth security overrides are preserved. The earlier
+Module 1 sections above describe that baseline; this extension does not implement
+permissions, controllers, persistence, frontend screens or deployment changes.
+
+### Shared authorization and architecture
+
+All new operations require a verified Bearer JWT and a currently ACTIVE account.
+Obtain actor UUID only from WorkSyncPrincipal. Recheck current project membership,
+responsibility and per-record authority server-side; browser role labels and
+stale JWT claims are not authority. System ADMIN is not private-project access.
+A blocked/rejected token may produce 401 under existing Auth filtering; an
+otherwise authenticated actor without project capability receives 403. Unknown,
+cross-project or deliberately non-disclosable resource IDs produce 404.
+
+Projects owns project authorization, memberships and writable/archive checks.
+Work Items owns scoped work records, assignment state, bug transitions,
+independent verification and history. Cross-module calls use public Java service
+contracts/immutable DTOs within the monolith, never repositories or JPA entities.
+M2 overview calls M3 summaries. These are not inter-service HTTP calls.
+
+| Actor | Authority and limits |
+| --- | --- |
+| ACTIVE + PROJECT_CREATE | Create a private project; atomically become its Owner and initial MANAGER. Account approval/ADMIN does not grant PROJECT_CREATE. |
+| Owner | Protected designation plus MANAGER membership; exclusively appoint/remove/demote Managers, transfer ownership and archive. Cannot remove/demote self while Owner. |
+| Additional MANAGER | Edit project/settings/milestones; manage Members/Viewers; create enabled Epic/Story/Task, assign and triage. Cannot administer other Managers or Owner. |
+| MEMBER + TECHNICAL_LEAD | Create enabled Epic/Story/Task, assign work, triage; designate QA verifier only. No project administration. |
+| MEMBER + DEVELOPER | Create only self-assigned TASK; edit allowed fields/progress of assigned work; report bugs and submit assigned fixes. No Epic/Story creation or reassignment of others. |
+| MEMBER + QA_TESTER | Report bugs, read permitted internal/testing work; verify only if designated for that bug. No ordinary development-task creation or generic progress mutation. |
+| VIEWER | Safe selector/project summary, own effective permissions, sanitized milestones, delivery summary/progress only. No raw work, bugs, internal summary, team directory, project configuration or preferences. |
+
+Only MEMBER has exactly one responsibility. MANAGER and VIEWER have none; OpenAPI
+`oneOf` enforces this conditional membership request shape. Targets must be ACTIVE.
+Owner transfer requires an existing ACTIVE Manager, is atomic, and leaves the old
+Owner a Manager. Competing mutations must preserve a valid Owner/Manager. Inactive
+Owner recovery remains a separate future security decision; never elevate ADMIN
+silently. Removal/reassignment of members with existing work requires final policy.
+
+All M2/M3 writes reject ARCHIVED projects with 409. Historical authorized reads
+remain available. Views never grant work rights: disabling LIST/BOARD removes
+availability without deleting records. Overview and Planning remain core. Six-step
+setup does not require completing brief/hierarchy at creation. Preferences apply
+to MEMBER only, one per project/current user; disabled/disallowed choices fall back
+to Planning or another authorized enabled page. Managers' separate preference
+screens and Viewer preferences are deferred.
+
+### Bug lifecycle and independent verification
+
+Bugs are Work Items with type BUG and the same UUID; subtasks are TASK records
+with a parent. Generic create/update/assignment routes cannot bypass specialized
+bug operations. Reproduction steps, expected/actual result and description are
+required plain text; reporter comes from principal. Severity is impact, priority
+is urgency. No upload/attachment-URL contract is introduced.
+
+| From | Operation / actor | To |
+| --- | --- | --- |
+| New | Report by Manager or Member | REPORTED |
+| REPORTED | BEGIN_TRIAGE by Manager/Lead | TRIAGE |
+| TRIAGE | ACCEPT with eligible fixer by Manager/Lead | ASSIGNED |
+| ASSIGNED | Start work by assigned fixer | IN_PROGRESS |
+| IN_PROGRESS | Submit fix by assigned fixer, independent verifier designated | READY_FOR_VERIFICATION |
+| READY_FOR_VERIFICATION | Designated verifier PASS | CLOSED; VERIFIED history event |
+| READY_FOR_VERIFICATION | Designated verifier FAIL | REOPENED |
+| REOPENED | Authorized triage/reassignment | ASSIGNED, then fixer starts IN_PROGRESS |
+| REPORTED or TRIAGE | Reasoned INVALID/DUPLICATE outcome by Manager/Lead | CLOSED, triage outcome recorded; no verification PASS |
+| IN_PROGRESS | Manager/Lead changes fixer | ASSIGNED; new fixer must start work |
+
+The fixed bug status set is REPORTED, TRIAGE, ASSIGNED, IN_PROGRESS,
+READY_FOR_VERIFICATION, REOPENED and CLOSED. PASS/FAIL are verification results;
+INVALID/DUPLICATE are recorded triage outcomes, not statuses. Successful fix
+verification closes with PASS; triage disposal closes with a reason and
+INVALID/DUPLICATE outcome, without fabricating PASS or VERIFIED history.
+BEGIN_TRIAGE is a request action; ACCEPT records ACCEPTED disposition.
+Duplicate targets must be another BUG in the same project, with no self/cycles.
+There is no VERIFIED or AWAITING_VERIFICATION status or generic bug-status PATCH.
+Failed verification is the reopen operation; no separate unrestricted reopen route.
+All unlisted transitions return 409. All actors must be ACTIVE and retain eligible
+membership; no mutation is allowed on an archived project.
+
+POST `/projects/{projectId}/bugs/{bugId}/start-work` is retained as an agreed
+explicit route: assigned fixer only, ASSIGNED -> IN_PROGRESS, with atomic
+START_WORK actor/time/state history. Being Manager/Lead is not a start-work override.
+
+Fixer assignment/reassignment is limited to ASSIGNED/IN_PROGRESS/REOPENED.
+A changed fixer in IN_PROGRESS resets to ASSIGNED; REOPENED also returns to
+ASSIGNED. Conflicting verifier assignment is invalidated; historical attempt
+submitter remains immutable. Verifier designation is allowed in ASSIGNED,
+IN_PROGRESS or REOPENED only. READY_FOR_VERIFICATION assignment changes return
+409 rather than changing the pending attempt's identity. These rules, state
+changes and history must be atomic under concurrent requests.
+
+Only the assigned fixer submits a fix. Only the designated ACTIVE eligible
+verifier records PASS/FAIL, and **a fixer may never verify their own fix**, even
+if Manager. Preserve the submitter of the specific fix attempt so reassignment
+cannot evade this rule. Manager may designate another eligible independent
+Member/Manager for one bug; Lead may select QA only. This does not promote roles
+or create a project-wide VERIFY_BUG grant. Recheck eligibility and status at
+verification, serialize competing verification/assignment changes, and retain
+append-only actor/time/state and attempt history. No eligible independent person
+means fix submission returns 409 and the bug remains IN_PROGRESS. No waiting
+status is introduced. Phoebe's Work Items module owns these records, fixer/verifier
+assignments, transitions and history; Kelvin's Projects module owns membership,
+ACTIVE participant eligibility and project authorization.
+
+### Persisted triage details and history
+
+BugResponse always includes nullable `triageOutcome`, `triageReason` and
+`duplicateOfBugId`. Before a disposition they are null; BEGIN_TRIAGE alone does
+not set one. ACCEPT records ACCEPTED; its explanation may be null. INVALID and
+DUPLICATE require a nonblank explanation. Only DUPLICATE populates duplicateOfBugId;
+it must identify a different BUG Work Item in the same project, with no duplicate
+cycle. References never grant access and require scoped type/project validation.
+
+Phoebe's Work Items domain persists the current decision and lifecycle change
+atomically, together with actor/time/state and the three decision fields in
+append-only bug history. BugHistoryResponse includes these nullable fields;
+non-triage events use null for decision fields, and historical triage events retain
+their original values. Later changes cannot rewrite earlier decision history.
+Exact persistence mapping/Flyway allocation remains a foundation decision; this
+PR adds no migration or working persistence implementation.
+
+### Role-specific effective permission responses
+
+GET `/projects/{projectId}/permissions/me` retains EffectiveProjectPermissionsResponse
+as its role-discriminated union. MANAGER/MEMBER receive
+InternalProjectPermissionsResponse: role, responsibility, isOwner, effective
+actions and authorized project configuration. Internal ProjectResponse also uses
+that internal permissions variant.
+
+VIEWER receives ViewerProjectPermissionsResponse only: role VIEWER, null
+responsibility, isOwner false, actions containing only VIEW_DELIVERY, and
+availableDeliveryFeatures restricted to DELIVERY_SUMMARY, MILESTONES and
+DELIVERY_PROGRESS. Availability is computed server-side for existing delivery
+surfaces; it never means data is approved for publication. Unpublished content
+remains omitted/null. No configuration, enabled work types, LIST/BOARD options,
+internal reports or administrative capabilities appear in the Viewer shape;
+unknown/extra fields are rejected by the schema. Publication mechanics remain
+planned and unchanged.
+
+### Request, response and validation conventions
+
+UUID project/user/work/bug/milestone references are scoped and validated. Return
+safe DTOs, never entities, password hashes or private directory data. Requests
+reject unknown fields; patch objects require at least one supported property.
+Dates use ISO date, timestamps date-time; startDate cannot exceed dueDate after
+patch application. Server services must enforce cross-field, role, hierarchy,
+state and concurrent integrity rules that OpenAPI cannot encode.
+
+Membership changes use complete role/responsibility replacement. Ordinary work
+updates exclude project/type/creator/assignee/parent mass assignment; dedicated
+assignment routes enforce eligible ACTIVE Member/Manager targets. Manager/Lead
+planning rights never permit fabricating another person's completion history.
+Bug reporter/status/fixer/verifier cannot be supplied in a report request.
+
+Lists reuse content/page/size/totalElements; page >= 0, size 1–100, default 20.
+Default ordering is createdAt DESC, id DESC; members tie-break on userId,
+milestones use dueDate ASC/id ASC, bug history createdAt ASC/id ASC. Work-list
+sort/filter/group vocabularies are controlled whitelists, not arbitrary query or
+property expressions. Role-specific queues use the principal for my fixes,
+reported-by-me and my verifications; filters never enlarge visibility.
+
+M2/M3 errors reuse application/json ApiError (code/message/timestamp, optional
+fieldErrors): 400 malformed/invalid fields, 401 missing/invalid authentication,
+403 insufficient capability, 404 unknown/cross-project/non-disclosable resource,
+409 archived/duplicate/ownership/lifecycle/assignment conflicts. Provider errors,
+SQL, stack traces and secrets must not be returned. A new M2M3Conflict reusable
+response preserves the existing Module 1 account-transition response unchanged.
+
+### Controlled personal preferences
+
+MEMBER only; Manager/Viewer editing remains deferred. Values are fixed below:
+
+| Field | Controlled values / checks |
+| --- | --- |
+| preferredView | PLANNING, LIST, BOARD; LIST/BOARD require project enablement |
+| landingPage | TECHNICAL_OVERVIEW (Lead), DEVELOPMENT_OVERVIEW (Developer), TESTING_OVERVIEW (QA), PLANNING, LIST, BOARD; role/view checks apply |
+| filters | type, ordinary status, bugStatus, priority, assignedToMe only; status/bugStatus mutually exclusive and compatible with type |
+| sort | CREATED_AT_DESC, DUE_DATE_ASC, PRIORITY_DESC; id DESC tie-breaker, null due dates last |
+| groupBy | NONE, STATUS, ASSIGNEE, TYPE |
+
+Unknown fields or enum values return 400. A recognized selection that is no longer
+available resolves to PLANNING for both effective view and landing page, including
+after role or feature changes. Supplied filters replace the filter object; `{}`
+clears filters. Preferences cannot enable features, override record/action
+permissions or reveal inaccessible work. MEMBER-only personal presentation is
+separate from Manager-controlled project configuration.
+
+### Viewer publication: deny publication by default
+
+Viewer responses contain only client-safe high-level delivery progress/status and
+approved milestone information; never internal tasks, bugs, team, assignments,
+technical notes, private activity or sensitive project brief. Selector/project
+summary and own permissions remain limited metadata routes, not internal browsing.
+
+A Manager must explicitly determine that the exact milestone title/date/status or
+aggregate snapshot is publishable. Internal existence, completion or membership
+never counts as publication approval. Projects owns publication authorization and
+the Viewer projection; Work Items supplies only sanitized approved aggregate
+inputs. Approval persistence, approval/revocation endpoints, snapshot freshness
+and the percentage formula remain **planned contract decisions**. No working
+publication feature or endpoint is invented here.
+
+Until that mechanism is reviewed and available, return an empty approved milestone
+list, null completionPercent and null deliveryStatus; do not fall back to internal
+records. Zero means an explicitly approved actual zero, not missing publication.
+Internal milestone endpoints remain authorized for Manager/Member; Viewer receives
+only approved ClientMilestoneResponse fields. This policy covers delivery-summary,
+delivery-progress and the Viewer branch of milestone reads equally.
+
+### Proposals and unresolved decisions (pending final review)
+
+`x-contract-decision: proposed-pending-review` marks schema/operation proposals.
+Agreed security invariants above apply regardless of eventual vocabulary.
+
+- Ordinary statuses TODO/IN_PROGRESS/IN_REVIEW/DONE; final transitions and
+  role/field-by-type edit/assignment matrix still require review.
+- Optional EPIC -> STORY -> TASK -> TASK subtask, at most one subtask level;
+  standalone tasks require neither Story nor Epic. Same-project, acyclic
+  hierarchy/link validation mandatory. Confirm optional milestone association.
+- Member internal directory scope is proposed from the agreement's "as agreed"
+  wording. Viewer never has directory access.
+- Ordinary creation starts TODO; omitted ordinary priority and initial bug priority
+  default to MEDIUM as a pending-review proposal. Initial priority LOW/MEDIUM/HIGH
+  (URGENT deferred), severity
+  LOW/MEDIUM/HIGH/CRITICAL, links RELATES_TO/BLOCKS, milestone lifecycle
+  PLANNED/ACHIEVED, delivery NOT_STARTED/IN_PROGRESS/DELIVERED need final approval.
+- Name/title/affected-area limits of 200 and fix-reference limit 500 remain
+  proposals, not claimed V13 decisions. Preference whitelists above
+  are now defined. Completion calculation, approval persistence/revocation and
+  client-safe milestone publication mechanics remain planned decisions.
+- PROJECT_CREATE grant persistence/API remains the separately planned Users
+  permission work. No blanket project creation until it is securely implemented.
+- Inactive-owner recovery, member removal with assignments, exact cross-module
+  Java signatures/packages, and shared Flyway version allocation remain open.
+  Current main has V1/V3/V4; no numbers are reserved or migrations changed here.
+- Home-wide invitations/assignments, calendar/Gantt, advanced Scrum, custom roles,
+  workflow customization, automation, files and integrations remain deferred.
+
+### Planned M2/M3 operation inventory
+
+All paths below are relative to `/api/v1`; `{projectId}` consistently names the
+agreement's project `{id}`. The YAML contains each request, response, error and
+operation-specific authorization rule.
+
+| Module | Method and path | Operation |
+| --- | --- | --- |
+| M2 | POST `/projects` | Create private project |
+| M2 | GET `/projects` | List accessible projects |
+| M2 | GET `/projects/{projectId}` | Read project |
+| M2 | PATCH `/projects/{projectId}` | Update project details |
+| M2 | GET `/projects/{projectId}/members` | List internal team |
+| M2 | POST `/projects/{projectId}/members` | Add ACTIVE project participant |
+| M2 | PATCH `/projects/{projectId}/members/{userId}` | Change role or responsibility |
+| M2 | DELETE `/projects/{projectId}/members/{userId}` | Remove project participant |
+| M2 | POST `/projects/{projectId}/ownership-transfer` | Transfer project ownership |
+| M2 | GET `/projects/{projectId}/permissions/me` | Read effective project permissions |
+| M2 | GET `/projects/{projectId}/configuration` | Read internal feature configuration |
+| M2 | PATCH `/projects/{projectId}/configuration` | Update project-wide configuration |
+| M2 | GET `/projects/{projectId}/preferences/me` | Read own workspace preferences |
+| M2 | PATCH `/projects/{projectId}/preferences/me` | Update own workspace preferences |
+| M2 | GET `/projects/{projectId}/milestones` | Read project milestones |
+| M2 | POST `/projects/{projectId}/milestones` | Create milestone |
+| M2 | PATCH `/projects/{projectId}/milestones/{milestoneId}` | Update milestone |
+| M2 | GET `/projects/{projectId}/overview` | Read role-aware internal overview |
+| M2 | GET `/projects/{projectId}/delivery-summary` | Read client-safe delivery summary |
+| M2 | PATCH `/projects/{projectId}/archive` | Archive project |
+| M3 | POST `/projects/{projectId}/work-items` | Create epic, story or task |
+| M3 | GET `/projects/{projectId}/work-items` | Query internal work for List/Board/backlog |
+| M3 | GET `/projects/{projectId}/work-items/{workItemId}` | Read internal work item |
+| M3 | PATCH `/projects/{projectId}/work-items/{workItemId}` | Update ordinary work planning/progress |
+| M3 | PATCH `/projects/{projectId}/work-items/{workItemId}/assignee` | Assign ordinary work |
+| M3 | POST `/projects/{projectId}/work-items/{workItemId}/subtasks` | Create child TASK |
+| M3 | POST `/projects/{projectId}/work-items/{workItemId}/links` | Link same-project work items |
+| M3 | POST `/projects/{projectId}/bugs` | Report BUG Work Item |
+| M3 | GET `/projects/{projectId}/bugs` | Query internal bug queues |
+| M3 | GET `/projects/{projectId}/bugs/{bugId}` | Read specialized BUG details |
+| M3 | POST `/projects/{projectId}/bugs/{bugId}/triage` | Triage or reassign reopened BUG |
+| M3 | PATCH `/projects/{projectId}/bugs/{bugId}/assignee` | Assign/reassign BUG fixer |
+| M3 | PATCH `/projects/{projectId}/bugs/{bugId}/verifier` | Designate independent BUG verifier |
+| M3 | POST `/projects/{projectId}/bugs/{bugId}/start-work` | Start assigned BUG fix |
+| M3 | POST `/projects/{projectId}/bugs/{bugId}/submit-fix` | Submit assigned fix for verification |
+| M3 | POST `/projects/{projectId}/bugs/{bugId}/verification` | Verify or reopen a BUG fix |
+| M3 | GET `/projects/{projectId}/bugs/{bugId}/history` | Read append-only BUG history |
+| M3 | GET `/projects/{projectId}/work-summary` | Read internal work aggregates |
+| M3 | GET `/projects/{projectId}/delivery-progress` | Read client-safe progress aggregate |
+
+### Added M2/M3 schemas
+
+`AddProjectMemberRequest`, `AssignBugVerifierRequest`, `AssignWorkItemRequest`, `BugHistoryPageResponse`, `BugHistoryResponse`, `BugPageResponse`, `BugResponse`, `BugSeverity`, `BugStatus`, `BugTriageOutcome`, `ClientDeliveryStatus`, `ClientDeliverySummaryResponse`, `ClientMilestonePageResponse`, `ClientMilestoneResponse`, `ClientWorkProgressSummary`, `CreateMilestoneRequest`, `CreateProjectRequest`, `CreateSubtaskRequest`, `CreateWorkItemLinkRequest`, `CreateWorkItemRequest`, `EffectiveProjectPermissionsResponse`, `InternalProjectPermissionsResponse`, `ViewerProjectPermissionsResponse`, `MilestonePageResponse`, `MilestoneResponse`, `MilestoneStatus`, `OrdinaryWorkItemResponse`, `ProjectAction`, `ProjectConfigurationResponse`, `ProjectLandingPage`, `ProjectMemberPageResponse`, `ProjectMemberResponse`, `ProjectOverviewResponse`, `ProjectPageResponse`, `ProjectPreferenceFields`, `ProjectPreferenceResponse`, `ProjectResponse`, `ProjectResponsibility`, `ProjectRole`, `ProjectStatus`, `ProjectSummaryResponse`, `ProjectView`, `ReportBugRequest`, `SubmitBugFixRequest`, `TransferOwnershipRequest`, `TriageBugRequest`, `UpdateMilestoneRequest`, `UpdateProjectConfigurationRequest`, `UpdateProjectMemberRequest`, `UpdateProjectPreferenceRequest`, `UpdateProjectRequest`, `UpdateWorkItemRequest`, `VerificationResult`, `VerifyBugRequest`, `WorkItemLinkResponse`, `WorkItemLinkType`, `WorkItemPageResponse`, `WorkItemPriority`, `WorkItemResponse`, `WorkItemStatus`, `WorkItemSummaryResponse`, `WorkItemType`.
