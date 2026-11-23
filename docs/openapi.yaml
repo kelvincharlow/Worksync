@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
-  title: Project & Work Management API - Module 1
-  version: 0.2.0
+  title: Project & Work Management API - Modules 1, 2 and 3
+  version: 0.3.0
   description: |
     Proposed, contract-first API for the initial Authentication, Users, and
     Notifications milestone. Users Step 5B Part 1 implements GET/PUT /users/me and
@@ -12,6 +12,11 @@ info:
     Other Users/Notifications operations remain planned.
     Auth-owned operation definitions below remain draft contracts; see
     docs/api-contract.md for the existing password-reset path mismatch.
+
+    Modules 2/3 (V13 agreement): all Projects, Work Items and Bugs operations are
+    planned, not implemented. See docs/api-contract.md for authority rules and
+    explicitly unresolved/proposed choices; x-contract-decision marks proposals.
+    Existing Module 1 operations and behavior are unchanged.
 
     Milestone design and draft future scope (not all implemented):
     - Spring Boot API and Blazor WebAssembly frontend.
@@ -63,6 +68,13 @@ tags:
     description: Administrator-only user management and access grants.
   - name: Notifications
     description: Notifications belonging to the authenticated user.
+
+  - name: Projects
+    description: 'Planned Module 2: private projects and project-scoped access.'
+  - name: Work Items
+    description: 'Planned Module 3: epics, stories, tasks and client-safe aggregates.'
+  - name: Bugs
+    description: 'Planned Module 3: BUG Work Item lifecycle and independent verification.'
 
 # Bearer authentication applies by default. Public endpoints explicitly opt out.
 security:
@@ -656,6 +668,1625 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
 
+  /projects:
+    post:
+      tags:
+      - Projects
+      operationId: createProject
+      summary: Create private project
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: ACTIVE + explicitly granted PROJECT_CREATE; no automatic ADMIN bypass. Create
+        owner designation and initial MANAGER membership in the same transaction. Organization permission persistence/grant
+        endpoint remains a Module 1 dependency, not implemented here.'
+      security:
+      - BearerAuth: []
+      x-authorization: ACTIVE + explicitly granted PROJECT_CREATE; no automatic ADMIN bypass.
+      responses:
+        '201':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProjectRequest'
+    get:
+      tags:
+      - Projects
+      operationId: listMyProjects
+      summary: List accessible projects
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: ACTIVE authenticated actor; scope to own current memberships. No-project state
+        returns empty content; safe selector summaries only. Fixed createdAt DESC, id DESC proposed.'
+      security:
+      - BearerAuth: []
+      x-authorization: ACTIVE authenticated actor; scope to own current memberships.
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectPageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/M2M3Page'
+      - $ref: '#/components/parameters/M2M3Size'
+      - name: status
+        in: query
+        schema:
+          $ref: '#/components/schemas/ProjectStatus'
+  /projects/{projectId}:
+    get:
+      tags:
+      - Projects
+      operationId: getProject
+      summary: Read project
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: Current project participant (MANAGER, MEMBER, VIEWER); Viewer receives only whitelisted
+        client-safe fields. Return ProjectResponse to Manager/Member and ProjectSummaryResponse to Viewer; no internal
+        brief, owner/creator directory or team payload to Viewer.'
+      security:
+      - BearerAuth: []
+      x-authorization: Current project participant (MANAGER, MEMBER, VIEWER); Viewer receives only whitelisted client-safe
+        fields.
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: '#/components/schemas/ProjectResponse'
+                - $ref: '#/components/schemas/ProjectSummaryResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    patch:
+      tags:
+      - Projects
+      operationId: updateProject
+      summary: Update project details
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: Owner or additional MANAGER; not ordinary MEMBER/VIEWER. '
+      security:
+      - BearerAuth: []
+      x-authorization: Owner or additional MANAGER; not ordinary MEMBER/VIEWER.
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProjectRequest'
+  /projects/{projectId}/members:
+    get:
+      tags:
+      - Projects
+      operationId: listProjectMembers
+      summary: List internal team
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: Owner/MANAGER or MEMBER (TECHNICAL_LEAD, DEVELOPER, QA_TESTER); never VIEWER.
+        Manager/Member team visibility chosen as review proposal from agreement wording "as agreed". No Viewer directory.
+        Fixed createdAt DESC, userId DESC. Proposal requiring review: Confirm MEMBER team-directory scope.'
+      security:
+      - BearerAuth: []
+      x-authorization: Owner/MANAGER or MEMBER (TECHNICAL_LEAD, DEVELOPER, QA_TESTER); never VIEWER.
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectMemberPageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/M2M3Page'
+      - $ref: '#/components/parameters/M2M3Size'
+      x-contract-decision: proposed-pending-review
+    post:
+      tags:
+      - Projects
+      operationId: addProjectMember
+      summary: Add ACTIVE project participant
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: Owner or additional MANAGER; not ordinary MEMBER/VIEWER. Only Owner may add a
+        MANAGER. One membership per project/user; duplicates 409, inactive/ineligible target 409.'
+      security:
+      - BearerAuth: []
+      x-authorization: Owner or additional MANAGER; not ordinary MEMBER/VIEWER. Only Owner may add a MANAGER.
+      responses:
+        '201':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectMemberResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddProjectMemberRequest'
+  /projects/{projectId}/members/{userId}:
+    patch:
+      tags:
+      - Projects
+      operationId: updateProjectMember
+      summary: Change role or responsibility
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: Owner or additional MANAGER; not ordinary MEMBER/VIEWER. Only Owner may change
+        a membership whose old or new role is MANAGER. Current owner membership cannot be removed/demoted; serialize
+        competing changes to preserve owner/Manager invariant.'
+      security:
+      - BearerAuth: []
+      x-authorization: Owner or additional MANAGER; not ordinary MEMBER/VIEWER. Only Owner may change a membership
+        whose old or new role is MANAGER.
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectMemberResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/ProjectUserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProjectMemberRequest'
+    delete:
+      tags:
+      - Projects
+      operationId: removeProjectMember
+      summary: Remove project participant
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: Owner or additional MANAGER; not ordinary MEMBER/VIEWER. Only Owner may remove
+        MANAGER; cannot remove current Owner. No implicit reassignment or cascading history deletion; unresolved assignment/reference
+        handling is a foundation review gate. Conflicting ownership/reference invariant returns 409.'
+      security:
+      - BearerAuth: []
+      x-authorization: Owner or additional MANAGER; not ordinary MEMBER/VIEWER. Only Owner may remove MANAGER; cannot
+        remove current Owner.
+      responses:
+        '204':
+          description: Successful operation.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/ProjectUserId'
+  /projects/{projectId}/ownership-transfer:
+    post:
+      tags:
+      - Projects
+      operationId: transferProjectOwnership
+      summary: Transfer project ownership
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: Current Owner only. Transactionally validate target ACTIVE MANAGER and preserve
+        one valid Owner/Manager; concurrent changes cannot orphan project. Prior Owner remains MANAGER.'
+      security:
+      - BearerAuth: []
+      x-authorization: Current Owner only.
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferOwnershipRequest'
+  /projects/{projectId}/permissions/me:
+    get:
+      tags:
+      - Projects
+      operationId: getMyProjectPermissions
+      summary: Read effective project permissions
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: Current project participant (MANAGER, MEMBER, VIEWER); Viewer receives only whitelisted
+        client-safe fields.  Return InternalProjectPermissionsResponse to MANAGER/MEMBER, preserving authorized internal
+        configuration. Return ViewerProjectPermissionsResponse to VIEWER: VIEW_DELIVERY and only available delivery
+        summary/milestone/progress features; never configuration, work-item settings, internal reporting or admin
+        options. Availability never overrides unpublished-by-default publication rules.'
+      security:
+      - BearerAuth: []
+      x-authorization: Current project participant (MANAGER, MEMBER, VIEWER); Viewer receives only whitelisted client-safe
+        fields.
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EffectiveProjectPermissionsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+  /projects/{projectId}/configuration:
+    get:
+      tags:
+      - Projects
+      operationId: getProjectConfiguration
+      summary: Read internal feature configuration
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: Owner/MANAGER or MEMBER (TECHNICAL_LEAD, DEVELOPER, QA_TESTER); never VIEWER. '
+      security:
+      - BearerAuth: []
+      x-authorization: Owner/MANAGER or MEMBER (TECHNICAL_LEAD, DEVELOPER, QA_TESTER); never VIEWER.
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectConfigurationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    patch:
+      tags:
+      - Projects
+      operationId: updateProjectConfiguration
+      summary: Update project-wide configuration
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: Owner or additional MANAGER; not ordinary MEMBER/VIEWER. '
+      security:
+      - BearerAuth: []
+      x-authorization: Owner or additional MANAGER; not ordinary MEMBER/VIEWER.
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectConfigurationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProjectConfigurationRequest'
+  /projects/{projectId}/preferences/me:
+    get:
+      tags:
+      - Projects
+      operationId: getMyProjectPreferences
+      summary: Read own workspace preferences
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: MEMBER only (any responsibility); Manager/Viewer support deferred. '
+      security:
+      - BearerAuth: []
+      x-authorization: MEMBER only (any responsibility); Manager/Viewer support deferred.
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectPreferenceResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    patch:
+      tags:
+      - Projects
+      operationId: updateMyProjectPreferences
+      summary: Update own workspace preferences
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: MEMBER only; current user from verified principal. Unavailable choices fall back
+        to an authorized page and never enable disabled project features.'
+      security:
+      - BearerAuth: []
+      x-authorization: MEMBER only; current user from verified principal.
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectPreferenceResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProjectPreferenceRequest'
+  /projects/{projectId}/milestones:
+    get:
+      tags:
+      - Projects
+      operationId: listProjectMilestones
+      summary: Read project milestones
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: Current project participant (MANAGER, MEMBER, VIEWER); Viewer receives only whitelisted
+        client-safe fields. Manager/Member receive MilestonePageResponse; Viewer receives only publishable ClientMilestonePageResponse.
+        Fixed dueDate ASC, id ASC. Unpublished by default. Manager must explicitly approve the exact milestone fields
+        or client-safe aggregate snapshot for publication; mere internal existence/completion or project membership
+        never publishes data. M2 owns publication authorization and Viewer projection; M3 supplies only sanitized
+        approved aggregate inputs. Approval persistence, endpoint, revocation and snapshot freshness are a planned
+        contract decision, not an implemented feature. Until a reviewed approval mechanism exists, return no milestones
+        and null progress/status, never internal fallbacks. Internal tasks/bugs, assignees/team, technical notes,
+        private activity, counts and sensitive project brief excluded.'
+      security:
+      - BearerAuth: []
+      x-authorization: Current project participant (MANAGER, MEMBER, VIEWER); Viewer receives only whitelisted client-safe
+        fields.
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/MilestonePageResponse'
+                - $ref: '#/components/schemas/ClientMilestonePageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/M2M3Page'
+      - $ref: '#/components/parameters/M2M3Size'
+    post:
+      tags:
+      - Projects
+      operationId: createProjectMilestone
+      summary: Create milestone
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: Owner or additional MANAGER; not ordinary MEMBER/VIEWER. '
+      security:
+      - BearerAuth: []
+      x-authorization: Owner or additional MANAGER; not ordinary MEMBER/VIEWER.
+      responses:
+        '201':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MilestoneResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMilestoneRequest'
+  /projects/{projectId}/milestones/{milestoneId}:
+    patch:
+      tags:
+      - Projects
+      operationId: updateProjectMilestone
+      summary: Update milestone
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: Owner or additional MANAGER; not ordinary MEMBER/VIEWER. '
+      security:
+      - BearerAuth: []
+      x-authorization: Owner or additional MANAGER; not ordinary MEMBER/VIEWER.
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MilestoneResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/MilestoneId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMilestoneRequest'
+  /projects/{projectId}/overview:
+    get:
+      tags:
+      - Projects
+      operationId: getProjectOverview
+      summary: Read role-aware internal overview
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: Owner/MANAGER or MEMBER (TECHNICAL_LEAD, DEVELOPER, QA_TESTER); never VIEWER. '
+      security:
+      - BearerAuth: []
+      x-authorization: Owner/MANAGER or MEMBER (TECHNICAL_LEAD, DEVELOPER, QA_TESTER); never VIEWER.
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectOverviewResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+  /projects/{projectId}/delivery-summary:
+    get:
+      tags:
+      - Projects
+      operationId: getClientDeliverySummary
+      summary: Read client-safe delivery summary
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: Current project participant (MANAGER, MEMBER, VIEWER); Viewer receives only whitelisted
+        client-safe fields.  Unpublished by default. Manager must explicitly approve the exact milestone fields or
+        client-safe aggregate snapshot for publication; mere internal existence/completion or project membership never
+        publishes data. M2 owns publication authorization and Viewer projection; M3 supplies only sanitized approved
+        aggregate inputs. Approval persistence, endpoint, revocation and snapshot freshness are a planned contract
+        decision, not an implemented feature. Until a reviewed approval mechanism exists, return no milestones and
+        null progress/status, never internal fallbacks. Internal tasks/bugs, assignees/team, technical notes, private
+        activity, counts and sensitive project brief excluded.'
+      security:
+      - BearerAuth: []
+      x-authorization: Current project participant (MANAGER, MEMBER, VIEWER); Viewer receives only whitelisted client-safe
+        fields.
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientDeliverySummaryResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+  /projects/{projectId}/archive:
+    patch:
+      tags:
+      - Projects
+      operationId: archiveProject
+      summary: Archive project
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: Current Owner only. ACTIVE -> ARCHIVED only; repeat archive returns 409. Preserve
+        historical authorized reads; all M2/M3 writes fail with 409 after archive. No restore/delete endpoint in this
+        release.'
+      security:
+      - BearerAuth: []
+      x-authorization: Current Owner only.
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+  /projects/{projectId}/work-items:
+    post:
+      tags:
+      - Work Items
+      operationId: createWorkItem
+      summary: Create epic, story or task
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: MANAGER or MEMBER/TECHNICAL_LEAD; not DEVELOPER, QA_TESTER or VIEWER. DEVELOPER
+        may create TASK assigned automatically to self only; QA/Viewer denied. Type must be enabled; unknown/cross-project
+        parent or milestone 404; invalid hierarchy/assignment state 409.'
+      security:
+      - BearerAuth: []
+      x-authorization: MANAGER or MEMBER/TECHNICAL_LEAD; not DEVELOPER, QA_TESTER or VIEWER. DEVELOPER may create
+        TASK assigned automatically to self only; QA/Viewer denied.
+      responses:
+        '201':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrdinaryWorkItemResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWorkItemRequest'
+    get:
+      tags:
+      - Work Items
+      operationId: listWorkItems
+      summary: Query internal work for List/Board/backlog
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: Owner/MANAGER or MEMBER (TECHNICAL_LEAD, DEVELOPER, QA_TESTER); never VIEWER.
+        BUG records use BugResponse union variant. Scope filters to authorized project; invalid filter/type combinations
+        400; disabled optional view 409. No home-wide cross-project endpoint is introduced.'
+      security:
+      - BearerAuth: []
+      x-authorization: Owner/MANAGER or MEMBER (TECHNICAL_LEAD, DEVELOPER, QA_TESTER); never VIEWER.
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkItemPageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/M2M3Page'
+      - $ref: '#/components/parameters/M2M3Size'
+      - name: type
+        in: query
+        schema:
+          $ref: '#/components/schemas/WorkItemType'
+      - name: status
+        in: query
+        schema:
+          $ref: '#/components/schemas/WorkItemStatus'
+        description: Ordinary work status; for BUG use bugStatus.
+      - name: bugStatus
+        in: query
+        schema:
+          $ref: '#/components/schemas/BugStatus'
+      - name: priority
+        in: query
+        schema:
+          $ref: '#/components/schemas/WorkItemPriority'
+      - name: assigneeId
+        in: query
+        schema:
+          type: string
+          format: uuid
+      - name: parentId
+        in: query
+        schema:
+          type: string
+          format: uuid
+      - name: milestoneId
+        in: query
+        schema:
+          type: string
+          format: uuid
+      - name: view
+        in: query
+        schema:
+          $ref: '#/components/schemas/ProjectView'
+        description: LIST/BOARD must be enabled; presentation never changes record authorization.
+      - name: sort
+        in: query
+        schema:
+          type: string
+          enum:
+          - CREATED_AT_DESC
+          - DUE_DATE_ASC
+          - PRIORITY_DESC
+          default: CREATED_AT_DESC
+        description: Proposed whitelist; append id as deterministic tie-breaker, null due dates last.
+  /projects/{projectId}/work-items/{workItemId}:
+    get:
+      tags:
+      - Work Items
+      operationId: getWorkItem
+      summary: Read internal work item
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: Owner/MANAGER or MEMBER (TECHNICAL_LEAD, DEVELOPER, QA_TESTER); never VIEWER. '
+      security:
+      - BearerAuth: []
+      x-authorization: Owner/MANAGER or MEMBER (TECHNICAL_LEAD, DEVELOPER, QA_TESTER); never VIEWER.
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkItemResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/WorkItemId'
+    patch:
+      tags:
+      - Work Items
+      operationId: updateWorkItem
+      summary: Update ordinary work planning/progress
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: Assigned actor for own permitted progress; MANAGER/TECHNICAL_LEAD for permitted
+        planning fields; QA testing scope only, not ordinary development edits; never VIEWER. BUG mutation via this
+        route is 409; specialized bug operations only. Reporter alone grants no unrestricted edit. Actor/field/status
+        matrix pending review.'
+      security:
+      - BearerAuth: []
+      x-authorization: Assigned actor for own permitted progress; MANAGER/TECHNICAL_LEAD for permitted planning fields;
+        QA testing scope only, not ordinary development edits; never VIEWER.
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrdinaryWorkItemResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/WorkItemId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateWorkItemRequest'
+  /projects/{projectId}/work-items/{workItemId}/assignee:
+    patch:
+      tags:
+      - Work Items
+      operationId: assignWorkItem
+      summary: Assign ordinary work
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: MANAGER or MEMBER/TECHNICAL_LEAD; not DEVELOPER, QA_TESTER or VIEWER. BUG must
+        use bug assignee route (409 here). No assignment state bypass or falsified completion history.'
+      security:
+      - BearerAuth: []
+      x-authorization: MANAGER or MEMBER/TECHNICAL_LEAD; not DEVELOPER, QA_TESTER or VIEWER.
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrdinaryWorkItemResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/WorkItemId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignWorkItemRequest'
+  /projects/{projectId}/work-items/{workItemId}/subtasks:
+    post:
+      tags:
+      - Work Items
+      operationId: createSubtask
+      summary: Create child TASK
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: MANAGER or MEMBER/TECHNICAL_LEAD; not DEVELOPER, QA_TESTER or VIEWER. DEVELOPER
+        may create self-assigned child TASK only; QA/Viewer denied. '
+      security:
+      - BearerAuth: []
+      x-authorization: MANAGER or MEMBER/TECHNICAL_LEAD; not DEVELOPER, QA_TESTER or VIEWER. DEVELOPER may create
+        self-assigned child TASK only; QA/Viewer denied.
+      responses:
+        '201':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrdinaryWorkItemResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/WorkItemId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSubtaskRequest'
+  /projects/{projectId}/work-items/{workItemId}/links:
+    post:
+      tags:
+      - Work Items
+      operationId: createWorkItemLink
+      summary: Link same-project work items
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: MANAGER or MEMBER/TECHNICAL_LEAD; not DEVELOPER, QA_TESTER or VIEWER. '
+      security:
+      - BearerAuth: []
+      x-authorization: MANAGER or MEMBER/TECHNICAL_LEAD; not DEVELOPER, QA_TESTER or VIEWER.
+      responses:
+        '201':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkItemLinkResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/WorkItemId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWorkItemLinkRequest'
+  /projects/{projectId}/bugs:
+    post:
+      tags:
+      - Bugs
+      operationId: reportBug
+      summary: Report BUG Work Item
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: Owner/MANAGER or MEMBER (TECHNICAL_LEAD, DEVELOPER, QA_TESTER); never VIEWER.
+        Manager and all three MEMBER responsibilities may report. Honor enabled BUG feature; principal supplies immutable
+        reporter; append report event.'
+      security:
+      - BearerAuth: []
+      x-authorization: Owner/MANAGER or MEMBER (TECHNICAL_LEAD, DEVELOPER, QA_TESTER); never VIEWER.
+      responses:
+        '201':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BugResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReportBugRequest'
+    get:
+      tags:
+      - Bugs
+      operationId: listBugs
+      summary: Query internal bug queues
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: Owner/MANAGER or MEMBER (TECHNICAL_LEAD, DEVELOPER, QA_TESTER); never VIEWER.
+        Fixed createdAt DESC, id DESC; role-aware queues do not enlarge visibility.'
+      security:
+      - BearerAuth: []
+      x-authorization: Owner/MANAGER or MEMBER (TECHNICAL_LEAD, DEVELOPER, QA_TESTER); never VIEWER.
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BugPageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/M2M3Page'
+      - $ref: '#/components/parameters/M2M3Size'
+      - name: status
+        in: query
+        schema:
+          $ref: '#/components/schemas/BugStatus'
+      - name: severity
+        in: query
+        schema:
+          $ref: '#/components/schemas/BugSeverity'
+      - name: priority
+        in: query
+        schema:
+          $ref: '#/components/schemas/WorkItemPriority'
+      - name: fixerUserId
+        in: query
+        schema:
+          type: string
+          format: uuid
+      - name: verifierUserId
+        in: query
+        schema:
+          type: string
+          format: uuid
+      - name: reporterUserId
+        in: query
+        schema:
+          type: string
+          format: uuid
+      - name: queue
+        in: query
+        schema:
+          type: string
+          enum:
+          - ALL
+          - MY_FIXES
+          - MY_VERIFICATIONS
+          - REPORTED_BY_ME
+          - TRIAGE
+        description: Actor-specific queues derive identity from principal; choosing a queue never grants action authority.
+          MY_VERIFICATIONS filters designated READY_FOR_VERIFICATION bugs.
+      - name: triageOutcome
+        in: query
+        description: Recorded triage disposition; INVALID/DUPLICATE are not workflow statuses.
+        schema:
+          $ref: '#/components/schemas/BugTriageOutcome'
+  /projects/{projectId}/bugs/{bugId}:
+    get:
+      tags:
+      - Bugs
+      operationId: getBug
+      summary: Read specialized BUG details
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: Owner/MANAGER or MEMBER (TECHNICAL_LEAD, DEVELOPER, QA_TESTER); never VIEWER.
+        bugId is WorkItem UUID whose type must be BUG in this project; other types return 404.'
+      security:
+      - BearerAuth: []
+      x-authorization: Owner/MANAGER or MEMBER (TECHNICAL_LEAD, DEVELOPER, QA_TESTER); never VIEWER.
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BugResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/BugId'
+  /projects/{projectId}/bugs/{bugId}/triage:
+    post:
+      tags:
+      - Bugs
+      operationId: triageBug
+      summary: Triage or reassign reopened BUG
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: MANAGER or MEMBER/TECHNICAL_LEAD; not DEVELOPER, QA_TESTER or VIEWER. BEGIN_TRIAGE:
+        REPORTED -> TRIAGE. ACCEPT: TRIAGE or REOPENED -> ASSIGNED with eligible ACTIVE fixer; record ACCEPTED outcome.
+        INVALID/DUPLICATE: REPORTED or TRIAGE -> CLOSED with corresponding triage outcome and nonblank reason, no
+        verification PASS. DUPLICATE requires another BUG in same project and no self/duplicate cycle. No other transitions.
+        Outcome request action BEGIN_TRIAGE is not a persisted triage disposition. Persist triageOutcome, triageReason
+        and duplicateOfBugId as the current BUG triage decision in Work Items, atomically with the lifecycle operation
+        and append-only history. Before triage all three are null; BEGIN_TRIAGE alone does not set a disposition.
+        ACCEPT records ACCEPTED; its reason may be null. INVALID/DUPLICATE require a nonblank reason. duplicateOfBugId
+        is populated only for DUPLICATE, otherwise null; it must identify a different Work Item of type BUG in the
+        same project, never self, another type or another project, and must not create duplicate cycles. Validate
+        through project-scoped lookup; do not infer permission from a reference. History records the decision fields
+        as an immutable event snapshot with actor/time/state; later changes never overwrite prior history. Exact persistence
+        mapping and migration version remain foundation implementation decisions, not schema changes in this documentation
+        PR.'
+      security:
+      - BearerAuth: []
+      x-authorization: MANAGER or MEMBER/TECHNICAL_LEAD; not DEVELOPER, QA_TESTER or VIEWER.
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BugResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/BugId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TriageBugRequest'
+  /projects/{projectId}/bugs/{bugId}/assignee:
+    patch:
+      tags:
+      - Bugs
+      operationId: assignBugFixer
+      summary: Assign/reassign BUG fixer
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: MANAGER or MEMBER/TECHNICAL_LEAD; not DEVELOPER, QA_TESTER or VIEWER. Manager/Technical
+        Lead only. Assign/reassign eligible ACTIVE MEMBER/MANAGER while ASSIGNED, IN_PROGRESS or REOPENED only. REOPENED
+        -> ASSIGNED; a changed fixer in IN_PROGRESS also resets to ASSIGNED so the new fixer explicitly starts work.
+        ASSIGNED stays ASSIGNED. Reject READY_FOR_VERIFICATION/CLOSED and other states with 409. Invalidate a conflicting
+        verifier; never overwrite historical fix-attempt submitter. Record assignment and every state change atomically.'
+      security:
+      - BearerAuth: []
+      x-authorization: MANAGER or MEMBER/TECHNICAL_LEAD; not DEVELOPER, QA_TESTER or VIEWER.
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BugResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/BugId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignWorkItemRequest'
+  /projects/{projectId}/bugs/{bugId}/verifier:
+    patch:
+      tags:
+      - Bugs
+      operationId: designateBugVerifier
+      summary: Designate independent BUG verifier
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: MANAGER or MEMBER/TECHNICAL_LEAD; not DEVELOPER, QA_TESTER or VIEWER. Lead may
+        designate QA_TESTER only; non-QA fallback requires MANAGER. Eligible ACTIVE project MEMBER/MANAGER only, never
+        VIEWER. Manager may designate an independent non-QA contributor when necessary for this bug only; Technical
+        Lead may select QA_TESTER only. Candidate cannot be fixer or fix submitter. Allowed while ASSIGNED/IN_PROGRESS/REOPENED;
+        READY_FOR_VERIFICATION reassignment rejected with 409 to preserve pending attempt identity. Record history;
+        recheck current eligibility before verification.'
+      security:
+      - BearerAuth: []
+      x-authorization: MANAGER or MEMBER/TECHNICAL_LEAD; not DEVELOPER, QA_TESTER or VIEWER. Lead may designate QA_TESTER
+        only; non-QA fallback requires MANAGER.
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BugResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/BugId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignBugVerifierRequest'
+  /projects/{projectId}/bugs/{bugId}/start-work:
+    post:
+      tags:
+      - Bugs
+      operationId: startBugWork
+      summary: Start assigned BUG fix
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: Assigned ACTIVE eligible fixer only (Manager or Member); not merely Manager/Lead
+        by role. Only assigned eligible ACTIVE fixer: ASSIGNED -> IN_PROGRESS. Append START_WORK actor/time/old/new-state
+        history atomically. No role-only override. Other states return 409.'
+      security:
+      - BearerAuth: []
+      x-authorization: Assigned ACTIVE eligible fixer only (Manager or Member); not merely Manager/Lead by role.
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BugResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/BugId'
+  /projects/{projectId}/bugs/{bugId}/submit-fix:
+    post:
+      tags:
+      - Bugs
+      operationId: submitBugFix
+      summary: Submit assigned fix for verification
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: Assigned ACTIVE eligible fixer only; independent verifier must already be designated.
+        Assigned ACTIVE fixer only, IN_PROGRESS -> READY_FOR_VERIFICATION; eligible independent verifier already designated.
+        Preserve fix submitter identity for this attempt. Without eligible verifier return 409 and retain IN_PROGRESS.
+        Summary required; optional reference is plain text, not attachment/upload/fetched URL. Append submission history.'
+      security:
+      - BearerAuth: []
+      x-authorization: Assigned ACTIVE eligible fixer only; independent verifier must already be designated.
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BugResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/BugId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitBugFixRequest'
+  /projects/{projectId}/bugs/{bugId}/verification:
+    post:
+      tags:
+      - Bugs
+      operationId: verifyBugFix
+      summary: Verify or reopen a BUG fix
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: Explicitly designated ACTIVE eligible verifier only; fixer/fix submitter cannot
+        verify their own fix, even if MANAGER. Only designated eligible ACTIVE project MEMBER/MANAGER, never VIEWER
+        or fixer/fix submitter of this attempt. READY_FOR_VERIFICATION only: PASS -> CLOSED, FAIL -> REOPENED. Atomically
+        record immutable attempt, actor, timestamp, notes and VERIFIED/FAILED_VERIFICATION plus reopening history.
+        Concurrent/repeated consumption of same attempt returns 409. Caller role alone never grants verification.'
+      security:
+      - BearerAuth: []
+      x-authorization: Explicitly designated ACTIVE eligible verifier only; fixer/fix submitter cannot verify their
+        own fix, even if MANAGER.
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BugResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/BugId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyBugRequest'
+  /projects/{projectId}/bugs/{bugId}/history:
+    get:
+      tags:
+      - Bugs
+      operationId: getBugHistory
+      summary: Read append-only BUG history
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: Owner/MANAGER or MEMBER (TECHNICAL_LEAD, DEVELOPER, QA_TESTER); never VIEWER.
+        Fixed createdAt ASC, id ASC. Include all verification attempts, assignments, triage, fix and reopen events;
+        internal only.'
+      security:
+      - BearerAuth: []
+      x-authorization: Owner/MANAGER or MEMBER (TECHNICAL_LEAD, DEVELOPER, QA_TESTER); never VIEWER.
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BugHistoryPageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/BugId'
+      - $ref: '#/components/parameters/M2M3Page'
+      - $ref: '#/components/parameters/M2M3Size'
+  /projects/{projectId}/work-summary:
+    get:
+      tags:
+      - Work Items
+      operationId: getProjectWorkSummary
+      summary: Read internal work aggregates
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: Owner/MANAGER or MEMBER (TECHNICAL_LEAD, DEVELOPER, QA_TESTER); never VIEWER. '
+      security:
+      - BearerAuth: []
+      x-authorization: Owner/MANAGER or MEMBER (TECHNICAL_LEAD, DEVELOPER, QA_TESTER); never VIEWER.
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkItemSummaryResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+  /projects/{projectId}/delivery-progress:
+    get:
+      tags:
+      - Work Items
+      operationId: getClientDeliveryProgress
+      summary: Read client-safe progress aggregate
+      x-implementation-status: planned
+      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
+        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
+        returns 403. Authorization: Current project participant (MANAGER, MEMBER, VIEWER); Viewer receives only whitelisted
+        client-safe fields.  Unpublished by default. Manager must explicitly approve the exact milestone fields or
+        client-safe aggregate snapshot for publication; mere internal existence/completion or project membership never
+        publishes data. M2 owns publication authorization and Viewer projection; M3 supplies only sanitized approved
+        aggregate inputs. Approval persistence, endpoint, revocation and snapshot freshness are a planned contract
+        decision, not an implemented feature. Until a reviewed approval mechanism exists, return no milestones and
+        null progress/status, never internal fallbacks. Internal tasks/bugs, assignees/team, technical notes, private
+        activity, counts and sensitive project brief excluded.'
+      security:
+      - BearerAuth: []
+      x-authorization: Current project participant (MANAGER, MEMBER, VIEWER); Viewer receives only whitelisted client-safe
+        fields.
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientWorkProgressSummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+
 components:
   securitySchemes:
     BearerAuth:
@@ -682,6 +2313,57 @@ components:
       schema:
         type: string
         example: 'ntf_501'
+
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ProjectUserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    MilestoneId:
+      name: milestoneId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    WorkItemId:
+      name: workItemId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    BugId:
+      name: bugId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    M2M3Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    M2M3Size:
+      name: size
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
 
   responses:
     BadRequest:
@@ -716,6 +2398,14 @@ components:
             $ref: '#/components/schemas/ApiError'
     TooManyRequests:
       description: Request rate limit exceeded.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+
+    M2M3Conflict:
+      description: Project archived, duplicate membership/link, ownership invariant, invalid lifecycle/assignment/verifier
+        or competing transition. Return a safe code/message/timestamp; never SQL or internal exceptions.
       content:
         application/json:
           schema:
@@ -1120,3 +2810,1716 @@ components:
         message:
           type: string
           example: 'Must use international format, e.g. +254712345678.'
+
+    ProjectRole:
+      type: string
+      enum:
+      - MANAGER
+      - MEMBER
+      - VIEWER
+    ProjectResponsibility:
+      type: string
+      enum:
+      - TECHNICAL_LEAD
+      - DEVELOPER
+      - QA_TESTER
+    ProjectStatus:
+      type: string
+      enum:
+      - ACTIVE
+      - ARCHIVED
+    WorkItemType:
+      type: string
+      enum:
+      - EPIC
+      - STORY
+      - TASK
+      - BUG
+    WorkItemStatus:
+      type: string
+      enum:
+      - TODO
+      - IN_PROGRESS
+      - IN_REVIEW
+      - DONE
+      description: 'Initial ordinary EPIC/STORY/TASK statuses: TODO, IN_PROGRESS, IN_REVIEW, DONE. Never used for BUG
+        lifecycle. Detailed ordinary-work transition/field permissions remain a foundation review decision.'
+    WorkItemPriority:
+      type: string
+      enum:
+      - LOW
+      - MEDIUM
+      - HIGH
+      x-contract-decision: proposed-pending-review
+      description: Proposed first-release urgency bands; URGENT is deferred pending agreement.
+    BugSeverity:
+      type: string
+      enum:
+      - LOW
+      - MEDIUM
+      - HIGH
+      - CRITICAL
+      x-contract-decision: proposed-pending-review
+      description: Proposed impact bands, independent of fix urgency/priority; confirm definitions before implementation.
+    WorkItemLinkType:
+      type: string
+      enum:
+      - RELATES_TO
+      - BLOCKS
+      x-contract-decision: proposed-pending-review
+      description: Proposed link whitelist. BLOCKS is directional and must not introduce dependency cycles. RELATES_TO
+        is symmetric and deduplicated.
+    BugStatus:
+      type: string
+      enum:
+      - REPORTED
+      - TRIAGE
+      - ASSIGNED
+      - IN_PROGRESS
+      - READY_FOR_VERIFICATION
+      - REOPENED
+      - CLOSED
+      description: Fixed workflow. PASS/FAIL are verification results, INVALID/DUPLICATE are triage outcomes, never
+        statuses. CLOSED represents successful PASS closure or an explicitly reasoned INVALID/DUPLICATE triage disposition;
+        triage closure is not a verified fix.
+      x-permitted-transitions:
+      - from: REPORTED
+        action: BEGIN_TRIAGE
+        to: TRIAGE
+        actor: MANAGER or TECHNICAL_LEAD
+      - from: TRIAGE
+        action: ACCEPT
+        to: ASSIGNED
+        actor: MANAGER or TECHNICAL_LEAD
+      - from: REOPENED
+        action: ACCEPT or ASSIGN
+        to: ASSIGNED
+        actor: MANAGER or TECHNICAL_LEAD
+      - from: ASSIGNED
+        action: START_WORK
+        to: IN_PROGRESS
+        actor: Assigned fixer
+      - from: IN_PROGRESS
+        action: SUBMIT_FIX
+        to: READY_FOR_VERIFICATION
+        actor: Assigned fixer; independent verifier designated
+      - from: READY_FOR_VERIFICATION
+        action: PASS
+        to: CLOSED
+        actor: Designated independent verifier
+      - from: READY_FOR_VERIFICATION
+        action: FAIL
+        to: REOPENED
+        actor: Designated independent verifier
+      - from: REPORTED
+        action: INVALID or DUPLICATE
+        to: CLOSED
+        actor: MANAGER or TECHNICAL_LEAD; reason required
+      - from: TRIAGE
+        action: INVALID or DUPLICATE
+        to: CLOSED
+        actor: MANAGER or TECHNICAL_LEAD; reason required
+      - from: IN_PROGRESS
+        action: CHANGE_FIXER
+        to: ASSIGNED
+        actor: MANAGER or TECHNICAL_LEAD
+    VerificationResult:
+      type: string
+      enum:
+      - PASS
+      - FAIL
+    ProjectAction:
+      type: string
+      enum:
+      - VIEW_INTERNAL_WORK
+      - VIEW_DELIVERY
+      - CREATE_EPIC
+      - CREATE_STORY
+      - CREATE_TASK
+      - UPDATE_ASSIGNED_WORK
+      - ASSIGN_WORK
+      - REPORT_BUG
+      - TRIAGE_BUG
+      - DESIGNATE_BUG_VERIFIER
+    ProjectView:
+      type: string
+      enum:
+      - PLANNING
+      - LIST
+      - BOARD
+    CreateProjectRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          maxLength: 200
+          minLength: 1
+          pattern: .*\S.*
+        description:
+          type: string
+        requirements:
+          type: string
+        scope:
+          type: string
+        deliverables:
+          type: string
+        successCriteria:
+          type: string
+        startDate:
+          type: string
+          format: date
+          nullable: true
+        dueDate:
+          type: string
+          format: date
+          nullable: true
+      required:
+      - name
+      description: Private project. Owner/creator come from authenticated principal, never request data. Brief/dates
+        may be completed later; startDate <= dueDate when both supplied. Proposed name limit 200 pending review. Core
+        Overview/Planning are always enabled. Optional views are configured separately. Initial project lifecycle is
+        ACTIVE; only explicit Owner archive changes it.
+      x-contract-decision: proposed-pending-review
+    UpdateProjectRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          maxLength: 200
+          minLength: 1
+          pattern: .*\S.*
+        description:
+          type: string
+        requirements:
+          type: string
+        scope:
+          type: string
+        deliverables:
+          type: string
+        successCriteria:
+          type: string
+        startDate:
+          type: string
+          format: date
+          nullable: true
+        dueDate:
+          type: string
+          format: date
+          nullable: true
+      description: Partial update; at least one supported field. Non-null name, no owner/creator/status/membership mass
+        assignment. Null dates clear them; startDate <= dueDate after applying patch.
+      minProperties: 1
+      x-contract-decision: proposed-pending-review
+    AddProjectMemberRequest:
+      oneOf:
+      - type: object
+        additionalProperties: false
+        properties:
+          userId:
+            type: string
+            format: uuid
+          role:
+            type: string
+            enum:
+            - MANAGER
+          responsibility:
+            type: string
+            nullable: true
+            enum:
+            - null
+        required:
+        - userId
+        - role
+      - type: object
+        additionalProperties: false
+        properties:
+          userId:
+            type: string
+            format: uuid
+          role:
+            type: string
+            enum:
+            - VIEWER
+          responsibility:
+            type: string
+            nullable: true
+            enum:
+            - null
+        required:
+        - userId
+        - role
+      - type: object
+        additionalProperties: false
+        properties:
+          userId:
+            type: string
+            format: uuid
+          role:
+            type: string
+            enum:
+            - MEMBER
+          responsibility:
+            $ref: '#/components/schemas/ProjectResponsibility'
+        required:
+        - userId
+        - role
+        - responsibility
+      description: Complete role/responsibility replacement. MEMBER requires exactly one responsibility; MANAGER/VIEWER
+        allow only absent/null responsibility. Target must be ACTIVE. A MANAGER source or target requires Owner authorization;
+        current Owner cannot be demoted/removed before ownership transfer.
+    UpdateProjectMemberRequest:
+      oneOf:
+      - type: object
+        additionalProperties: false
+        properties:
+          role:
+            type: string
+            enum:
+            - MANAGER
+          responsibility:
+            type: string
+            nullable: true
+            enum:
+            - null
+        required:
+        - role
+      - type: object
+        additionalProperties: false
+        properties:
+          role:
+            type: string
+            enum:
+            - VIEWER
+          responsibility:
+            type: string
+            nullable: true
+            enum:
+            - null
+        required:
+        - role
+      - type: object
+        additionalProperties: false
+        properties:
+          role:
+            type: string
+            enum:
+            - MEMBER
+          responsibility:
+            $ref: '#/components/schemas/ProjectResponsibility'
+        required:
+        - role
+        - responsibility
+      description: Complete role/responsibility replacement. MEMBER requires exactly one responsibility; MANAGER/VIEWER
+        allow only absent/null responsibility. Target must be ACTIVE. A MANAGER source or target requires Owner authorization;
+        current Owner cannot be demoted/removed before ownership transfer.
+    ProjectMemberResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        userId:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        role:
+          $ref: '#/components/schemas/ProjectRole'
+        responsibility:
+          type: string
+          enum:
+          - TECHNICAL_LEAD
+          - DEVELOPER
+          - QA_TESTER
+          - null
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - userId
+      - displayName
+      - role
+      - responsibility
+      - createdAt
+      - updatedAt
+      description: Internal team projection only; no credentials/contact directory for Viewer.
+    TransferOwnershipRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        newOwnerUserId:
+          type: string
+          format: uuid
+      required:
+      - newOwnerUserId
+      description: Target must be a different ACTIVE existing MANAGER. Atomic transfer preserves matching Manager membership;
+        previous Owner remains Manager.
+    ProjectConfigurationResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        enabledViews:
+          type: array
+          items:
+            type: string
+            enum:
+            - LIST
+            - BOARD
+          uniqueItems: true
+        enabledWorkTypes:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkItemType'
+          uniqueItems: true
+      required:
+      - enabledViews
+      - enabledWorkTypes
+      description: Overview/Planning are mandatory. Calendar/Gantt, custom workflows and advanced modules are deferred.
+        Disabling optional views/types never deletes existing work or grants edit rights.
+    UpdateProjectConfigurationRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        enabledViews:
+          type: array
+          items:
+            type: string
+            enum:
+            - LIST
+            - BOARD
+          uniqueItems: true
+        enabledWorkTypes:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkItemType'
+          uniqueItems: true
+      description: Overview/Planning are mandatory. Calendar/Gantt, custom workflows and advanced modules are deferred.
+        Disabling optional views/types never deletes existing work or grants edit rights.
+      minProperties: 1
+    EffectiveProjectPermissionsResponse:
+      oneOf:
+      - $ref: '#/components/schemas/InternalProjectPermissionsResponse'
+      - $ref: '#/components/schemas/ViewerProjectPermissionsResponse'
+      discriminator:
+        propertyName: role
+        mapping:
+          MANAGER: '#/components/schemas/InternalProjectPermissionsResponse'
+          MEMBER: '#/components/schemas/InternalProjectPermissionsResponse'
+          VIEWER: '#/components/schemas/ViewerProjectPermissionsResponse'
+      description: Role-specific safe current-participant permissions. Manager/Member receive the internal variant;
+        Viewer receives only the restricted client-facing variant. Never serialize internal configuration and redact
+        it afterward. The two closed shapes reject extra fields.
+    ProjectSummaryResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        status:
+          $ref: '#/components/schemas/ProjectStatus'
+        role:
+          $ref: '#/components/schemas/ProjectRole'
+        responsibility:
+          type: string
+          enum:
+          - TECHNICAL_LEAD
+          - DEVELOPER
+          - QA_TESTER
+          - null
+          nullable: true
+        isOwner:
+          type: boolean
+      required:
+      - id
+      - name
+      - status
+      - role
+      - responsibility
+      - isOwner
+      description: Project-selector projection scoped to actor memberships; no other participant identities or internal
+        brief for Viewer.
+    ProjectResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          maxLength: 200
+          minLength: 1
+          pattern: .*\S.*
+        description:
+          type: string
+        requirements:
+          type: string
+        scope:
+          type: string
+        deliverables:
+          type: string
+        successCriteria:
+          type: string
+        startDate:
+          type: string
+          format: date
+          nullable: true
+        dueDate:
+          type: string
+          format: date
+          nullable: true
+        id:
+          type: string
+          format: uuid
+        creatorUserId:
+          type: string
+          format: uuid
+        ownerUserId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/ProjectStatus'
+        permissions:
+          $ref: '#/components/schemas/InternalProjectPermissionsResponse'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - id
+      - name
+      - creatorUserId
+      - ownerUserId
+      - status
+      - permissions
+      - createdAt
+      - updatedAt
+      description: Internal Manager/Member projection. Never returned to Viewer. Owner designation is distinct from
+        project role.
+    ProjectLandingPage:
+      type: string
+      enum:
+      - TECHNICAL_OVERVIEW
+      - DEVELOPMENT_OVERVIEW
+      - TESTING_OVERVIEW
+      - PLANNING
+      - LIST
+      - BOARD
+      description: MEMBER landing whitelist. TECHNICAL_OVERVIEW requires TECHNICAL_LEAD; DEVELOPMENT_OVERVIEW requires
+        DEVELOPER; TESTING_OVERVIEW requires QA_TESTER. PLANNING always available; LIST/BOARD require project enablement.
+    ProjectPreferenceFields:
+      type: object
+      additionalProperties: false
+      properties:
+        preferredView:
+          $ref: '#/components/schemas/ProjectView'
+        landingPage:
+          $ref: '#/components/schemas/ProjectLandingPage'
+        filters:
+          type: object
+          additionalProperties: false
+          properties:
+            type:
+              $ref: '#/components/schemas/WorkItemType'
+            status:
+              $ref: '#/components/schemas/WorkItemStatus'
+            priority:
+              $ref: '#/components/schemas/WorkItemPriority'
+            assignedToMe:
+              type: boolean
+            bugStatus:
+              $ref: '#/components/schemas/BugStatus'
+          not:
+            anyOf:
+            - required:
+              - status
+              - bugStatus
+            - required:
+              - type
+              - status
+              properties:
+                type:
+                  enum:
+                  - BUG
+            - required:
+              - type
+              - bugStatus
+              properties:
+                type:
+                  enum:
+                  - EPIC
+                  - STORY
+                  - TASK
+        sort:
+          type: string
+          enum:
+          - CREATED_AT_DESC
+          - DUE_DATE_ASC
+          - PRIORITY_DESC
+        groupBy:
+          type: string
+          enum:
+          - NONE
+          - STATUS
+          - ASSIGNEE
+          - TYPE
+      description: 'Controlled MEMBER-only fields. preferredView PLANNING/LIST/BOARD; landing restricted by responsibility
+        and enabled views. Filters type/status/bugStatus/priority/assignedToMe only: ordinary status cannot target BUG;
+        bugStatus cannot target non-BUG, mutually exclusive status filters. Sort CREATED_AT_DESC/DUE_DATE_ASC/PRIORITY_DESC
+        with id DESC tie-breaker (null due dates last); group NONE/STATUS/ASSIGNEE/TYPE. No arbitrary query/property
+        expressions. Unknown/structurally invalid values return 400. A recognized but disabled/disallowed saved choice
+        falls back to PLANNING; role changes re-resolve permissions. No preference enables features or expands record/action
+        access. Manager/Viewer preference editing deferred.'
+    UpdateProjectPreferenceRequest:
+      allOf:
+      - $ref: '#/components/schemas/ProjectPreferenceFields'
+      description: Partial update of current MEMBER only, at least one field. Reject unknown fields/enum values with
+        400; supplied filters replace the filter object (empty object clears filters). Re-resolve view/landing against
+        current responsibility and enabled configuration; unavailable selection uses PLANNING. Response includes effective
+        values; never grants access.
+      minProperties: 1
+    ProjectPreferenceResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        projectId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        preferences:
+          $ref: '#/components/schemas/ProjectPreferenceFields'
+        effectiveView:
+          $ref: '#/components/schemas/ProjectView'
+        effectiveLandingPage:
+          $ref: '#/components/schemas/ProjectLandingPage'
+      required:
+      - projectId
+      - userId
+      - preferences
+      - effectiveView
+      - effectiveLandingPage
+    MilestoneStatus:
+      type: string
+      enum:
+      - PLANNED
+      - ACHIEVED
+      x-contract-decision: proposed-pending-review
+      description: Proposed milestone lifecycle; project archive separately prohibits writes. Confirm before implementation.
+    CreateMilestoneRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        title:
+          type: string
+          maxLength: 200
+          minLength: 1
+          pattern: .*\S.*
+        dueDate:
+          type: string
+          format: date
+      required:
+      - title
+      - dueDate
+      description: Proposed title limit 200; initial PLANNED status.
+      x-contract-decision: proposed-pending-review
+    UpdateMilestoneRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        title:
+          type: string
+          maxLength: 200
+          minLength: 1
+          pattern: .*\S.*
+        dueDate:
+          type: string
+          format: date
+        status:
+          $ref: '#/components/schemas/MilestoneStatus'
+      description: At least one field; no project reassignment. Proposed lifecycle and title limit pending review.
+      minProperties: 1
+      x-contract-decision: proposed-pending-review
+    MilestoneResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        projectId:
+          type: string
+          format: uuid
+        title:
+          type: string
+          maxLength: 200
+          minLength: 1
+          pattern: .*\S.*
+        dueDate:
+          type: string
+          format: date
+        status:
+          $ref: '#/components/schemas/MilestoneStatus'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - id
+      - projectId
+      - title
+      - dueDate
+      - status
+      - createdAt
+      - updatedAt
+    ClientMilestoneResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        dueDate:
+          type: string
+          format: date
+          nullable: true
+        status:
+          $ref: '#/components/schemas/MilestoneStatus'
+      required:
+      - id
+      - title
+      - status
+      x-contract-decision: publication-mechanism-planned
+      description: Only explicitly Manager-approved title/dueDate/status may appear. Unpublished by default. Manager
+        must explicitly approve the exact milestone fields or client-safe aggregate snapshot for publication; mere internal
+        existence/completion or project membership never publishes data. M2 owns publication authorization and Viewer
+        projection; M3 supplies only sanitized approved aggregate inputs. Approval persistence, endpoint, revocation
+        and snapshot freshness are a planned contract decision, not an implemented feature. Until a reviewed approval
+        mechanism exists, return no milestones and null progress/status, never internal fallbacks. Internal tasks/bugs,
+        assignees/team, technical notes, private activity, counts and sensitive project brief excluded.
+    ClientWorkProgressSummary:
+      type: object
+      additionalProperties: false
+      properties:
+        completionPercent:
+          type: number
+          minimum: 0
+          maximum: 100
+          nullable: true
+      required:
+      - completionPercent
+      x-contract-decision: publication-mechanism-planned
+      description: Publishable high-level percentage only (0–100), null when unpublished/unavailable; zero is actual
+        approved zero progress, not a substitute for missing approval. Unpublished by default. Manager must explicitly
+        approve the exact milestone fields or client-safe aggregate snapshot for publication; mere internal existence/completion
+        or project membership never publishes data. M2 owns publication authorization and Viewer projection; M3 supplies
+        only sanitized approved aggregate inputs. Approval persistence, endpoint, revocation and snapshot freshness
+        are a planned contract decision, not an implemented feature. Until a reviewed approval mechanism exists, return
+        no milestones and null progress/status, never internal fallbacks. Internal tasks/bugs, assignees/team, technical
+        notes, private activity, counts and sensitive project brief excluded.
+    ClientDeliverySummaryResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        projectId:
+          type: string
+          format: uuid
+        deliveryStatus:
+          type: string
+          nullable: true
+          enum:
+          - NOT_STARTED
+          - IN_PROGRESS
+          - DELIVERED
+          - null
+        progress:
+          $ref: '#/components/schemas/ClientWorkProgressSummary'
+        milestones:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClientMilestoneResponse'
+      required:
+      - projectId
+      - deliveryStatus
+      - progress
+      - milestones
+      description: 'Minimal projection: project identifier, approved delivery status, publishable high-level progress
+        and approved milestones only. Unpublished by default. Manager must explicitly approve the exact milestone fields
+        or client-safe aggregate snapshot for publication; mere internal existence/completion or project membership
+        never publishes data. M2 owns publication authorization and Viewer projection; M3 supplies only sanitized approved
+        aggregate inputs. Approval persistence, endpoint, revocation and snapshot freshness are a planned contract decision,
+        not an implemented feature. Until a reviewed approval mechanism exists, return no milestones and null progress/status,
+        never internal fallbacks. Internal tasks/bugs, assignees/team, technical notes, private activity, counts and
+        sensitive project brief excluded.'
+      x-contract-decision: publication-mechanism-planned
+    CreateWorkItemRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          enum:
+          - EPIC
+          - STORY
+          - TASK
+        title:
+          type: string
+          maxLength: 200
+          minLength: 1
+          pattern: .*\S.*
+        description:
+          type: string
+        priority:
+          allOf:
+          - $ref: '#/components/schemas/WorkItemPriority'
+          default: MEDIUM
+        parentId:
+          type: string
+          format: uuid
+          nullable: true
+        milestoneId:
+          type: string
+          format: uuid
+          nullable: true
+        assigneeId:
+          type: string
+          format: uuid
+          nullable: true
+        startDate:
+          type: string
+          format: date
+          nullable: true
+        dueDate:
+          type: string
+          format: date
+          nullable: true
+      required:
+      - type
+      - title
+      description: 'Manager/Technical Lead may create enabled types and select eligible assignee. Developer TASK only:
+        assignee is actor automatically; a different supplied assignee is forbidden. QA cannot create ordinary work.
+        No BUG creation here. Proposed hierarchy EPIC -> STORY -> TASK -> TASK subtask (one subtask level), standalone
+        tasks allowed; same-project parents/milestones, no cycles/self references, startDate <= dueDate. Hierarchy,
+        optional milestone association and numeric limits pending review. Initial ordinary status TODO and omitted priority
+        MEDIUM are proposed defaults.'
+      x-contract-decision: proposed-pending-review
+    UpdateWorkItemRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        title:
+          type: string
+          maxLength: 200
+          minLength: 1
+          pattern: .*\S.*
+        description:
+          type: string
+        priority:
+          $ref: '#/components/schemas/WorkItemPriority'
+        milestoneId:
+          type: string
+          format: uuid
+          nullable: true
+        startDate:
+          type: string
+          format: date
+          nullable: true
+        dueDate:
+          type: string
+          format: date
+          nullable: true
+        status:
+          $ref: '#/components/schemas/WorkItemStatus'
+      description: At least one allowed field; ordinary EPIC/STORY/TASK only. Assigned actor updates their progress;
+        Manager/Lead may edit planning fields but cannot falsify another actor completion. No type/project/creator/assignee
+        changes, no BUG lifecycle mutations. Generic transition and field-by-actor matrix require review.
+      minProperties: 1
+      x-contract-decision: proposed-pending-review
+    AssignWorkItemRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        assigneeId:
+          type: string
+          format: uuid
+      required:
+      - assigneeId
+      description: ACTIVE eligible project MEMBER/MANAGER, never VIEWER; capability/state compatibility checked through
+        Projects service and M3. Responsibility/type assignment matrix remains a review gate.
+    CreateSubtaskRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        title:
+          type: string
+          maxLength: 200
+          minLength: 1
+          pattern: .*\S.*
+        description:
+          type: string
+        priority:
+          $ref: '#/components/schemas/WorkItemPriority'
+        milestoneId:
+          type: string
+          format: uuid
+          nullable: true
+        assigneeId:
+          type: string
+          format: uuid
+          nullable: true
+        startDate:
+          type: string
+          format: date
+          nullable: true
+        dueDate:
+          type: string
+          format: date
+          nullable: true
+      required:
+      - title
+      description: Type is always TASK; parent comes from path. Proposed one TASK-subtask level only; same-project parent
+        TASK, no nesting under an existing subtask. Developer child assigned to self; QA denied ordinary creation.
+      x-contract-decision: proposed-pending-review
+    CreateWorkItemLinkRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        targetWorkItemId:
+          type: string
+          format: uuid
+        type:
+          $ref: '#/components/schemas/WorkItemLinkType'
+      required:
+      - targetWorkItemId
+      - type
+      description: Same project; no self/duplicate links or dependency cycles. Proposed approved link types pending
+        review.
+      x-contract-decision: proposed-pending-review
+    WorkItemLinkResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        sourceWorkItemId:
+          type: string
+          format: uuid
+        targetWorkItemId:
+          type: string
+          format: uuid
+        type:
+          $ref: '#/components/schemas/WorkItemLinkType'
+      required:
+      - id
+      - sourceWorkItemId
+      - targetWorkItemId
+      - type
+    OrdinaryWorkItemResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        projectId:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum:
+          - EPIC
+          - STORY
+          - TASK
+        title:
+          type: string
+          maxLength: 200
+          minLength: 1
+          pattern: .*\S.*
+        description:
+          type: string
+        priority:
+          $ref: '#/components/schemas/WorkItemPriority'
+        parentId:
+          type: string
+          format: uuid
+          nullable: true
+        milestoneId:
+          type: string
+          format: uuid
+          nullable: true
+        assigneeId:
+          type: string
+          format: uuid
+          nullable: true
+        startDate:
+          type: string
+          format: date
+          nullable: true
+        dueDate:
+          type: string
+          format: date
+          nullable: true
+        creatorUserId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/WorkItemStatus'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - id
+      - projectId
+      - type
+      - title
+      - creatorUserId
+      - status
+      - priority
+      - createdAt
+      - updatedAt
+    ReportBugRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        title:
+          type: string
+          maxLength: 200
+          minLength: 1
+          pattern: .*\S.*
+        description:
+          type: string
+          minLength: 1
+          pattern: .*\S.*
+        affectedArea:
+          type: string
+          maxLength: 200
+          minLength: 1
+          pattern: .*\S.*
+        severity:
+          $ref: '#/components/schemas/BugSeverity'
+        reproductionSteps:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            pattern: .*\S.*
+          minItems: 1
+        expectedResult:
+          type: string
+          minLength: 1
+          pattern: .*\S.*
+        actualResult:
+          type: string
+          minLength: 1
+          pattern: .*\S.*
+        relatedWorkItemId:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - title
+      - description
+      - severity
+      - reproductionSteps
+      - expectedResult
+      - actualResult
+      description: Reporter derived from verified principal; initial REPORTED status and append-only history. Affected
+        area optional but nonblank when supplied; proposed length limit 200. Related work must be same project. No client
+        actor/status/fixer/verifier fields. Evidence is plain text; uploads/attachment URLs are deferred. Initial priority
+        MEDIUM is proposed until authorized triage sets urgency.
+      x-contract-decision: proposed-pending-review
+    BugResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        title:
+          type: string
+          maxLength: 200
+          minLength: 1
+          pattern: .*\S.*
+        description:
+          type: string
+          minLength: 1
+          pattern: .*\S.*
+        affectedArea:
+          type: string
+          maxLength: 200
+          minLength: 1
+          pattern: .*\S.*
+        severity:
+          $ref: '#/components/schemas/BugSeverity'
+        reproductionSteps:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            pattern: .*\S.*
+          minItems: 1
+        expectedResult:
+          type: string
+          minLength: 1
+          pattern: .*\S.*
+        actualResult:
+          type: string
+          minLength: 1
+          pattern: .*\S.*
+        relatedWorkItemId:
+          type: string
+          format: uuid
+          nullable: true
+        id:
+          type: string
+          format: uuid
+        projectId:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum:
+          - BUG
+        reporterUserId:
+          type: string
+          format: uuid
+        fixerUserId:
+          type: string
+          format: uuid
+          nullable: true
+        verifierUserId:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          $ref: '#/components/schemas/BugStatus'
+        priority:
+          $ref: '#/components/schemas/WorkItemPriority'
+        latestVerificationResult:
+          type: string
+          enum:
+          - PASS
+          - FAIL
+          - null
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        triageOutcome:
+          type: string
+          nullable: true
+          enum:
+          - ACCEPTED
+          - INVALID
+          - DUPLICATE
+          - null
+          description: ACCEPTED, INVALID or DUPLICATE; null before a disposition. In history, null for events without
+            a triage decision.
+        triageReason:
+          type: string
+          nullable: true
+          description: Persisted explanation; null when absent/before triage. Nonblank for INVALID/DUPLICATE. History
+            contains the explanation recorded for that event.
+        duplicateOfBugId:
+          type: string
+          format: uuid
+          nullable: true
+          description: 'Persisted duplicate target: a different BUG Work Item in this project. Populated for DUPLICATE
+            only; otherwise null. History preserves the target recorded for that triage event.'
+      required:
+      - id
+      - projectId
+      - type
+      - title
+      - description
+      - reporterUserId
+      - fixerUserId
+      - verifierUserId
+      - status
+      - severity
+      - priority
+      - reproductionSteps
+      - expectedResult
+      - actualResult
+      - latestVerificationResult
+      - createdAt
+      - updatedAt
+      - triageOutcome
+      - triageReason
+      - duplicateOfBugId
+      description: 'A specialized Work Item: id is the shared work-item UUID, not a separate bug identifier. Generic
+        Work Items operations cannot mutate this status; use bug operations. Persist triageOutcome, triageReason and
+        duplicateOfBugId as the current BUG triage decision in Work Items, atomically with the lifecycle operation and
+        append-only history. Before triage all three are null; BEGIN_TRIAGE alone does not set a disposition. ACCEPT
+        records ACCEPTED; its reason may be null. INVALID/DUPLICATE require a nonblank reason. duplicateOfBugId is populated
+        only for DUPLICATE, otherwise null; it must identify a different Work Item of type BUG in the same project,
+        never self, another type or another project, and must not create duplicate cycles. Validate through project-scoped
+        lookup; do not infer permission from a reference. History records the decision fields as an immutable event
+        snapshot with actor/time/state; later changes never overwrite prior history. Exact persistence mapping and migration
+        version remain foundation implementation decisions, not schema changes in this documentation PR.'
+    WorkItemResponse:
+      oneOf:
+      - $ref: '#/components/schemas/OrdinaryWorkItemResponse'
+      - $ref: '#/components/schemas/BugResponse'
+      discriminator:
+        propertyName: type
+        mapping:
+          EPIC: '#/components/schemas/OrdinaryWorkItemResponse'
+          STORY: '#/components/schemas/OrdinaryWorkItemResponse'
+          TASK: '#/components/schemas/OrdinaryWorkItemResponse'
+          BUG: '#/components/schemas/BugResponse'
+      description: BUG is a Work Item with specialized lifecycle, never a second unrelated resource.
+    TriageBugRequest:
+      oneOf:
+      - type: object
+        additionalProperties: false
+        properties:
+          outcome:
+            type: string
+            enum:
+            - BEGIN_TRIAGE
+          priority:
+            $ref: '#/components/schemas/WorkItemPriority'
+        required:
+        - outcome
+      - type: object
+        additionalProperties: false
+        properties:
+          outcome:
+            type: string
+            enum:
+            - ACCEPT
+          priority:
+            $ref: '#/components/schemas/WorkItemPriority'
+          fixerUserId:
+            type: string
+            format: uuid
+        required:
+        - outcome
+        - priority
+        - fixerUserId
+      - type: object
+        additionalProperties: false
+        properties:
+          outcome:
+            type: string
+            enum:
+            - INVALID
+          priority:
+            $ref: '#/components/schemas/WorkItemPriority'
+          reason:
+            type: string
+            minLength: 1
+            pattern: .*\S.*
+        required:
+        - outcome
+        - reason
+      - type: object
+        additionalProperties: false
+        properties:
+          outcome:
+            type: string
+            enum:
+            - DUPLICATE
+          priority:
+            $ref: '#/components/schemas/WorkItemPriority'
+          reason:
+            type: string
+            minLength: 1
+            pattern: .*\S.*
+          duplicateOfBugId:
+            type: string
+            format: uuid
+        required:
+        - outcome
+        - reason
+        - duplicateOfBugId
+      description: 'BEGIN_TRIAGE: REPORTED -> TRIAGE. ACCEPT: TRIAGE or REOPENED -> ASSIGNED with eligible ACTIVE fixer;
+        record ACCEPTED outcome. INVALID/DUPLICATE: REPORTED or TRIAGE -> CLOSED with corresponding triage outcome and
+        nonblank reason, no verification PASS. DUPLICATE requires another BUG in same project and no self/duplicate
+        cycle. No other transitions. Outcome request action BEGIN_TRIAGE is not a persisted triage disposition. Persist
+        triageOutcome, triageReason and duplicateOfBugId as the current BUG triage decision in Work Items, atomically
+        with the lifecycle operation and append-only history. Before triage all three are null; BEGIN_TRIAGE alone does
+        not set a disposition. ACCEPT records ACCEPTED; its reason may be null. INVALID/DUPLICATE require a nonblank
+        reason. duplicateOfBugId is populated only for DUPLICATE, otherwise null; it must identify a different Work
+        Item of type BUG in the same project, never self, another type or another project, and must not create duplicate
+        cycles. Validate through project-scoped lookup; do not infer permission from a reference. History records the
+        decision fields as an immutable event snapshot with actor/time/state; later changes never overwrite prior history.
+        Exact persistence mapping and migration version remain foundation implementation decisions, not schema changes
+        in this documentation PR.'
+    AssignBugVerifierRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        verifierUserId:
+          type: string
+          format: uuid
+      required:
+      - verifierUserId
+      description: Eligible ACTIVE project MEMBER/MANAGER only, never VIEWER. Manager may designate an independent non-QA
+        contributor when necessary for this bug only; Technical Lead may select QA_TESTER only. Candidate cannot be
+        fixer or fix submitter. Allowed while ASSIGNED/IN_PROGRESS/REOPENED; READY_FOR_VERIFICATION reassignment rejected
+        with 409 to preserve pending attempt identity. Record history; recheck current eligibility before verification.
+    SubmitBugFixRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        summary:
+          type: string
+          minLength: 1
+          pattern: .*\S.*
+        reference:
+          type: string
+          maxLength: 500
+      required:
+      - summary
+      description: Assigned ACTIVE fixer only, IN_PROGRESS -> READY_FOR_VERIFICATION; eligible independent verifier
+        already designated. Preserve fix submitter identity for this attempt. Without eligible verifier return 409 and
+        retain IN_PROGRESS. Summary required; optional reference is plain text, not attachment/upload/fetched URL. Append
+        submission history.
+    VerifyBugRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        result:
+          $ref: '#/components/schemas/VerificationResult'
+        notes:
+          type: string
+          minLength: 1
+          pattern: .*\S.*
+        evidenceDescription:
+          type: string
+      required:
+      - result
+      - notes
+      description: 'Only designated eligible ACTIVE project MEMBER/MANAGER, never VIEWER or fixer/fix submitter of this
+        attempt. READY_FOR_VERIFICATION only: PASS -> CLOSED, FAIL -> REOPENED. Atomically record immutable attempt,
+        actor, timestamp, notes and VERIFIED/FAILED_VERIFICATION plus reopening history. Concurrent/repeated consumption
+        of same attempt returns 409. Caller role alone never grants verification.'
+    BugHistoryResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        bugId:
+          type: string
+          format: uuid
+        actorUserId:
+          type: string
+          format: uuid
+        action:
+          type: string
+        fromStatus:
+          type: string
+          enum:
+          - REPORTED
+          - TRIAGE
+          - ASSIGNED
+          - IN_PROGRESS
+          - READY_FOR_VERIFICATION
+          - REOPENED
+          - CLOSED
+          - null
+          description: Fixed workflow. PASS/FAIL are verification results, INVALID/DUPLICATE are triage outcomes, never
+            statuses. CLOSED represents successful PASS closure or an explicitly reasoned INVALID/DUPLICATE triage disposition;
+            triage closure is not a verified fix.
+          nullable: true
+        toStatus:
+          $ref: '#/components/schemas/BugStatus'
+        result:
+          type: string
+          enum:
+          - PASS
+          - FAIL
+          - null
+          nullable: true
+        notes:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        triageOutcome:
+          type: string
+          nullable: true
+          enum:
+          - ACCEPTED
+          - INVALID
+          - DUPLICATE
+          - null
+          description: ACCEPTED, INVALID or DUPLICATE; null before a disposition. In history, null for events without
+            a triage decision.
+        triageReason:
+          type: string
+          nullable: true
+          description: Persisted explanation; null when absent/before triage. Nonblank for INVALID/DUPLICATE. History
+            contains the explanation recorded for that event.
+        duplicateOfBugId:
+          type: string
+          format: uuid
+          nullable: true
+          description: 'Persisted duplicate target: a different BUG Work Item in this project. Populated for DUPLICATE
+            only; otherwise null. History preserves the target recorded for that triage event.'
+      required:
+      - id
+      - bugId
+      - actorUserId
+      - action
+      - toStatus
+      - createdAt
+      - triageOutcome
+      - triageReason
+      - duplicateOfBugId
+      description: 'Append-only events: REPORT, triage, assignment, verifier designation, START_WORK, SUBMIT_FIX, VERIFIED/FAILED_VERIFICATION,
+        REOPEN. Keep past fix submitter/verifier identities; changing assignment must not enable verifying one''s own
+        fix. Internal participants only. Persist triageOutcome, triageReason and duplicateOfBugId as the current BUG
+        triage decision in Work Items, atomically with the lifecycle operation and append-only history. Before triage
+        all three are null; BEGIN_TRIAGE alone does not set a disposition. ACCEPT records ACCEPTED; its reason may be
+        null. INVALID/DUPLICATE require a nonblank reason. duplicateOfBugId is populated only for DUPLICATE, otherwise
+        null; it must identify a different Work Item of type BUG in the same project, never self, another type or another
+        project, and must not create duplicate cycles. Validate through project-scoped lookup; do not infer permission
+        from a reference. History records the decision fields as an immutable event snapshot with actor/time/state;
+        later changes never overwrite prior history. Exact persistence mapping and migration version remain foundation
+        implementation decisions, not schema changes in this documentation PR.'
+    WorkItemSummaryResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        projectId:
+          type: string
+          format: uuid
+        byType:
+          type: object
+          additionalProperties:
+            type: integer
+            minimum: 0
+        byStatus:
+          type: object
+          additionalProperties:
+            type: integer
+            minimum: 0
+        byBugStatus:
+          type: object
+          additionalProperties:
+            type: integer
+            minimum: 0
+        total:
+          type: integer
+          minimum: 0
+      required:
+      - projectId
+      - total
+      - byType
+      - byStatus
+      - byBugStatus
+      description: Internal authorized aggregate; map keys restricted respectively to WorkItemType, WorkItemStatus and
+        BugStatus values. Never returned to VIEWER. Role-aware counts must not include records hidden from caller.
+    ProjectOverviewResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        project:
+          $ref: '#/components/schemas/ProjectResponse'
+        milestones:
+          type: array
+          items:
+            $ref: '#/components/schemas/MilestoneResponse'
+        workSummary:
+          $ref: '#/components/schemas/WorkItemSummaryResponse'
+      required:
+      - project
+      - milestones
+      - workSummary
+      description: Internal role-aware Manager/Member overview. M2 calls M3 aggregate service; no cross-module repository/entity
+        access.
+    ProjectPageResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectSummaryResponse'
+        page:
+          type: integer
+          minimum: 0
+        size:
+          type: integer
+          minimum: 1
+          maximum: 100
+        totalElements:
+          type: integer
+          format: int64
+          minimum: 0
+      required:
+      - content
+      - page
+      - size
+      - totalElements
+      description: Zero-based page; size 1–100, default 20. Stable sorting with UUID tie-breaker.
+    ProjectMemberPageResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectMemberResponse'
+        page:
+          type: integer
+          minimum: 0
+        size:
+          type: integer
+          minimum: 1
+          maximum: 100
+        totalElements:
+          type: integer
+          format: int64
+          minimum: 0
+      required:
+      - content
+      - page
+      - size
+      - totalElements
+      description: Zero-based page; size 1–100, default 20. Stable sorting with UUID tie-breaker.
+    MilestonePageResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/MilestoneResponse'
+        page:
+          type: integer
+          minimum: 0
+        size:
+          type: integer
+          minimum: 1
+          maximum: 100
+        totalElements:
+          type: integer
+          format: int64
+          minimum: 0
+      required:
+      - content
+      - page
+      - size
+      - totalElements
+      description: Zero-based page; size 1–100, default 20. Stable sorting with UUID tie-breaker.
+    ClientMilestonePageResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClientMilestoneResponse'
+        page:
+          type: integer
+          minimum: 0
+        size:
+          type: integer
+          minimum: 1
+          maximum: 100
+        totalElements:
+          type: integer
+          format: int64
+          minimum: 0
+      required:
+      - content
+      - page
+      - size
+      - totalElements
+      description: Zero-based page; size 1–100, default 20. Stable sorting with UUID tie-breaker.
+    WorkItemPageResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkItemResponse'
+        page:
+          type: integer
+          minimum: 0
+        size:
+          type: integer
+          minimum: 1
+          maximum: 100
+        totalElements:
+          type: integer
+          format: int64
+          minimum: 0
+      required:
+      - content
+      - page
+      - size
+      - totalElements
+      description: Zero-based page; size 1–100, default 20. Stable sorting with UUID tie-breaker.
+    BugPageResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/BugResponse'
+        page:
+          type: integer
+          minimum: 0
+        size:
+          type: integer
+          minimum: 1
+          maximum: 100
+        totalElements:
+          type: integer
+          format: int64
+          minimum: 0
+      required:
+      - content
+      - page
+      - size
+      - totalElements
+      description: Zero-based page; size 1–100, default 20. Stable sorting with UUID tie-breaker.
+    BugHistoryPageResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/BugHistoryResponse'
+        page:
+          type: integer
+          minimum: 0
+        size:
+          type: integer
+          minimum: 1
+          maximum: 100
+        totalElements:
+          type: integer
+          format: int64
+          minimum: 0
+      required:
+      - content
+      - page
+      - size
+      - totalElements
+      description: Zero-based page; size 1–100, default 20. Stable sorting with UUID tie-breaker.
+    ClientDeliveryStatus:
+      type: string
+      enum:
+      - NOT_STARTED
+      - IN_PROGRESS
+      - DELIVERED
+      x-contract-decision: proposed-pending-review
+      description: High-level vocabulary NOT_STARTED/IN_PROGRESS/DELIVERED remains proposed; value returned only when
+        explicitly approved for publication. Never expose internal lifecycle/activity as a default.
+    BugTriageOutcome:
+      type: string
+      enum:
+      - ACCEPTED
+      - INVALID
+      - DUPLICATE
+      description: Recorded triage disposition, independent of workflow status. Null before disposition. INVALID/DUPLICATE
+        close a report with reason and no fabricated PASS; DUPLICATE also requires a same-project non-self bug reference.
+    InternalProjectPermissionsResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        role:
+          type: string
+          enum:
+          - MANAGER
+          - MEMBER
+        responsibility:
+          type: string
+          enum:
+          - TECHNICAL_LEAD
+          - DEVELOPER
+          - QA_TESTER
+          - null
+          nullable: true
+        isOwner:
+          type: boolean
+        actions:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectAction'
+          uniqueItems: true
+        configuration:
+          $ref: '#/components/schemas/ProjectConfigurationResponse'
+      required:
+      - role
+      - responsibility
+      - isOwner
+      - actions
+      - configuration
+      description: Manager/Member permissions only, computed from current database-backed authorization. Retains role,
+        responsibility, Owner designation, effective actions and project configuration for authorized internal participants.
+        Not a Viewer response; action list must reflect actual role/responsibility, ownership and current project features.
+    ViewerProjectPermissionsResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - role
+      - responsibility
+      - isOwner
+      - actions
+      - availableDeliveryFeatures
+      properties:
+        role:
+          type: string
+          enum:
+          - VIEWER
+        responsibility:
+          type: string
+          nullable: true
+          enum:
+          - null
+        isOwner:
+          type: boolean
+          enum:
+          - false
+        actions:
+          type: array
+          uniqueItems: true
+          minItems: 1
+          maxItems: 1
+          items:
+            type: string
+            enum:
+            - VIEW_DELIVERY
+        availableDeliveryFeatures:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum:
+            - DELIVERY_SUMMARY
+            - MILESTONES
+            - DELIVERY_PROGRESS
+          description: Server-derived availability of existing client-facing delivery surfaces only. Describes access/presentation,
+            not publication approval; unpublished content remains omitted/null under publication rules. Never includes
+            LIST/BOARD, work-item types, internal reports or administrative options.
+      description: Whitelisted effective permissions for the current ACTIVE Viewer only. No configuration object, work-item
+        settings, internal/admin actions or reporting capabilities. Role/Owner/responsibility values are server-derived
+        constants for this variant. Publication approval mechanics remain planned; feature availability does not publish
+        data or expand authority.
