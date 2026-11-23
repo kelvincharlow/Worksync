@@ -32,8 +32,13 @@ public class AuthMessageHandler : DelegatingHandler
         {
             return await base.SendAsync(request, cancellationToken);
         }
-
+        
         await _authState.InitializeAsync();
+
+        if (IsOnPublicAuthRoute())
+        {
+            return await base.SendAsync(request, cancellationToken);
+        }
 
         // Proactively refresh if access token is expired/expiring and we have a refresh token
         if (!_authState.IsAccessTokenValid && _authState.HasRefreshToken)
@@ -111,6 +116,15 @@ public class AuthMessageHandler : DelegatingHandler
                    _apiBaseUri.AbsolutePath,
                    StringComparison.OrdinalIgnoreCase);
     }
+    private bool IsOnPublicAuthRoute()
+{
+    var relativePath = _navigation.ToBaseRelativePath(_navigation.Uri)
+        .Split('?', '#')[0]
+        .Trim('/')
+        .ToLowerInvariant();
+
+    return relativePath is "" or "login" or "register" or "forgot-password" or "reset-password";
+}
 
     private void RedirectToExpiredLogin()
     {

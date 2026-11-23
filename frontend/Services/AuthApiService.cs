@@ -39,39 +39,41 @@ public class AuthApiService
     public Task<ApiResult<PasswordResetResponse>> ConfirmPasswordResetAsync(PasswordResetConfirmRequest request)
         => PostAsync<PasswordResetResponse>("auth/reset-password", request, ApiErrorContext.PublicAuth);
 
-    public async Task<ApiResult> LogoutAsync()
+    public async Task<ApiResult> LogoutAsync(string? accessToken = null)
+{
+    try
     {
-        try
-        {
-            if (string.IsNullOrWhiteSpace(_authState.AccessToken))
-            {
-                return ApiResult.Fail("No active access token was found.");
-            }
+        var token = !string.IsNullOrWhiteSpace(accessToken)
+            ? accessToken
+            : _authState.AccessToken;
 
-            using var request = new HttpRequestMessage(HttpMethod.Post, "auth/logout");
-            request.Headers.Authorization =
-                new AuthenticationHeaderValue("Bearer", _authState.AccessToken);
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return ApiResult.Fail("No active access token was found.");
+        }
 
-            using var response = await _http.SendAsync(request);
-            return await ApiResponseHelper.ReadEmptyResultAsync(response, _logger, ApiErrorContext.ProtectedResource);
-        }
-        catch (HttpRequestException ex)
-        {
-            _logger.LogWarning(ex, "Logout request failed");
-            return ApiResult.Fail("Could not reach the server. Your local session will be cleared.");
-        }
-        catch (TaskCanceledException ex)
-        {
-            _logger.LogWarning(ex, "Logout request timed out");
-            return ApiResult.Fail("The logout request timed out. Your local session will be cleared.");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Unexpected error during logout");
-            return ApiResult.Fail("Could not complete server logout. Your local session will be cleared.");
-        }
+        using var request = new HttpRequestMessage(HttpMethod.Post, "auth/logout");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        using var response = await _http.SendAsync(request);
+        return await ApiResponseHelper.ReadEmptyResultAsync(response, _logger, ApiErrorContext.ProtectedResource);
     }
-
+    catch (HttpRequestException ex)
+    {
+        _logger.LogWarning(ex, "Logout request failed");
+        return ApiResult.Fail("Could not reach the server. Your local session will be cleared.");
+    }
+    catch (TaskCanceledException ex)
+    {
+        _logger.LogWarning(ex, "Logout request timed out");
+        return ApiResult.Fail("The logout request timed out. Your local session will be cleared.");
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Unexpected error during logout");
+        return ApiResult.Fail("Could not complete server logout. Your local session will be cleared.");
+    }
+}
     private async Task<ApiResult<T>> PostAsync<T>(string path, object payload, ApiErrorContext context)
     {
         try

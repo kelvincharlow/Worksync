@@ -10,7 +10,7 @@
 
 <PageTitle>Create account · Worksync</PageTitle>
 
-<div class="auth-shell auth-card">
+<div class="auth-shell auth-card auth-card-register">
     <div class="text-center">
         <img src="/images/logo.png" alt="WorkSync Logo" class="auth-card-logo" />
         <h1 class="auth-title">Create your account</h1>
@@ -67,7 +67,7 @@
                         type="tel"
                         class="form-control"
                         @bind-Value="_register.PhoneNumber"
-                        placeholder="+254 712345678"
+                        placeholder="+254712345678"
                         autocomplete="tel" />
                 @* <span class="auth-hint">Use international E.164 format (e.g. +254712345678).</span> *@
                 <ValidationMessage For="@(() => _register.PhoneNumber)" />

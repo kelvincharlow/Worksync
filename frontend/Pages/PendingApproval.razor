@@ -39,8 +39,7 @@
             {
                 <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
                     <strong>Awaiting administrator approval.</strong> Your account is currently
-                    <strong>PENDING_APPROVAL</strong>. You can update your profile details while waiting,
-                    but workspace access will unlock once an administrator approves your account.
+                    <strong>PENDING_APPROVAL</strong>. Yourworkspace access will unlock once an administrator approves your account.
                 </MudAlert>
             }
 
@@ -54,27 +53,6 @@
                 <MudAlert Severity="Severity.Error" Dense="true">@_errorMessage</MudAlert>
             }
 
-            <MudDivider />
-
-            <MudStack Spacing="1">
-                <MudText Typo="Typo.body2">
-                    <strong>Name:</strong> @($"{Auth.User?.FirstName} {Auth.User?.LastName}".Trim())
-                </MudText>
-                <MudText Typo="Typo.body2">
-                    <strong>Role:</strong> @(Auth.User?.Role ?? "USER")
-                </MudText>
-                <MudText Typo="Typo.body2">
-                    <strong>Current status:</strong>
-                    <MudChip T="string"
-                             Size="Size.Small"
-                             Color="@StatusColor"
-                             Variant="Variant.Filled"
-                             Class="ml-1">
-                        @CurrentStatus
-                    </MudChip>
-                </MudText>
-            </MudStack>
-
             <MudStack Row="true" Spacing="2" Class="flex-wrap pt-2">
                 <MudButton Variant="Variant.Filled"
                            Color="Color.Primary"
@@ -84,7 +62,7 @@
                     @(_isRefreshing ? "Checking status…" : "Refresh status")
                 </MudButton>
 
-                @if (CurrentStatus == "PENDING_APPROVAL")
+                @* @if (CurrentStatus == "PENDING_APPROVAL")
                 {
                     <MudButton Variant="Variant.Outlined"
                                Color="Color.Primary"
@@ -92,8 +70,8 @@
                                Href="/profile"
                                Disabled="@_isRefreshing">
                         My profile
-                    </MudButton>
-                }
+                    </MudButton> *@
+                @* }
 
                 <MudButton Variant="Variant.Text"
                            Color="Color.Error"
@@ -101,7 +79,7 @@
                            Disabled="@_isRefreshing"
                            OnClick="OpenLogoutDialogAsync">
                     Sign out
-                </MudButton>
+                </MudButton> *@
             </MudStack>
         </MudStack>
     </MudPaper>

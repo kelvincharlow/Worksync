@@ -65,14 +65,18 @@ public class AuthSessionService
             }
 
             var rotatedRefreshToken = string.IsNullOrWhiteSpace(result.Data.RefreshToken)
-                ? _authState.RefreshToken
+                ? null
                 : result.Data.RefreshToken;
+
+            var user = string.IsNullOrWhiteSpace(result.Data.User?.Id)
+                ? (_authState.User ?? result.Data.User!)
+                : result.Data.User;
 
             await _authState.SetSessionAsync(
                 result.Data.AccessToken,
                 rotatedRefreshToken,
                 result.Data.ExpiresIn,
-                result.Data.User);
+                user);
 
             return true;
         }
@@ -86,21 +90,18 @@ public class AuthSessionService
     /// Calls POST /auth/logout if an access token is present, and always clears local auth state.
     /// </summary>
     public async Task<ApiResult> LogoutAsync()
+{
+    await _authState.InitializeAsync();
+    var accessToken = _authState.AccessToken;
+
+    // Clear local state & browser storage immediately before calling the server
+    await _authState.ClearAsync();
+
+    if (string.IsNullOrWhiteSpace(accessToken))
     {
-        await _authState.InitializeAsync();
-
-        ApiResult result;
-        try
-        {
-            result = string.IsNullOrWhiteSpace(_authState.AccessToken)
-                ? ApiResult.Ok()
-                : await _authApi.LogoutAsync();
-        }
-        finally
-        {
-            await _authState.ClearAsync();
-        }
-
-        return result;
+        return ApiResult.Ok();
     }
+
+    return await _authApi.LogoutAsync(accessToken);
+}
 }

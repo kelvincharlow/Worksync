@@ -3,7 +3,7 @@
 
 @inject AuthState Auth
 @inject UserApiService UserApi
-@inject IDialogService DialogService 
+
 
 <PageTitle>Overview · Worksync</PageTitle>
 
@@ -88,126 +88,7 @@
             </MudItem>
         </MudGrid>
 
-        <MudGrid Spacing="3">
-            <MudItem xs="12" lg="8">
-                <section class="ws-panel">
-                    <div class="ws-panel-header">
-                        <div>
-                            <h2>Pending registrations</h2>
-                            <p>Review the most recent requests for access.</p>
-                        </div>
-                        <MudButton Variant="Variant.Outlined"
-                                   Size="Size.Small"
-                                   EndIcon="@Icons.Material.Rounded.ArrowForward"
-                                   Href="/admin/approvals">
-                            View All
-                        </MudButton>
-                    </div>
-
-                    @if (_isLoading)
-                    {
-                        <div class="pa-8 d-flex justify-center">
-                            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
-                        </div>
-                    }
-                    else if (_pendingUsers.Count == 0)
-                    {
-                        <div class="ws-empty">
-                            <MudIcon Icon="@Icons.Material.Outlined.CheckCircleOutline" Size="Size.Large" Color="Color.Success" />
-                            <h3>All caught up</h3>
-                            <p>There are no pending registration requests.</p>
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="ws-table-wrap">
-                            <table class="ws-table">
-                                <thead>
-                                    <tr>
-                                        <th>Applicant</th>
-                                        <th>Registered</th>
-                                        <th>Status</th>
-                                        <th></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach (var user in _pendingUsers)
-                                    {
-                                        <tr>
-                                            <td>
-                                                <div class="ws-person">
-                                                    <div class="ws-avatar">@GetInitials(user)</div>
-                                                    <div>
-                                                        <span class="ws-person-name">@($"{user.FirstName} {user.LastName}".Trim())</span>
-                                                        <span class="ws-person-email">@user.Email</span>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td>@FormatDate(user.CreatedAt)</td>
-                                            <td>
-                                                <span class="ws-status-pill @user.Status">@FormatStatus(user.Status)</span>
-                                            </td>
-                                            <td class="text-right">
-                                                <MudButton Variant="Variant.Filled"
-                                                           Size="Size.Small"
-                                                           Color="Color.Primary"
-                                                           OnClick="@(() => OpenReviewDialogAsync(user.Id))">
-                                                    Review
-                                                </MudButton>
-                                            </td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
-                    }
-                </section>
-            </MudItem>
-
-            <MudItem xs="12" lg="4">
-                <section class="ws-panel pa-5">
-                    <div class="mb-4">
-                        <h2 style="font-size: 1rem; font-weight: 700; margin: 0 0 2px;">Quick actions</h2>
-                        <p style="font-size: 0.8rem; color: #64748B; margin: 0;">Common account-administration tasks</p>
-                    </div>
-
-                    <div class="ws-hint-card">
-                        <strong>Account approval matters</strong>
-                        <p>Only approved accounts can access protected WorkSync features. Review details before making a decision.</p>
-                    </div>
-
-                    <div class="ws-tip">
-                        <span class="ws-tip-icon">
-                            <MudIcon Icon="@Icons.Material.Outlined.HowToReg" Size="Size.Small" />
-                        </span>
-                        <div>
-                            <strong style="font-size: 0.82rem; display: block;">Review pending accounts</strong>
-                            <p style="font-size: 0.76rem; color: #64748B; margin: 3px 0 8px;">
-                                Approve or reject registration requests.
-                            </p>
-                            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" Href="/admin/approvals">
-                                Open queue
-                            </MudButton>
-                        </div>
-                    </div>
-
-                    <div class="ws-tip">
-                        <span class="ws-tip-icon">
-                            <MudIcon Icon="@Icons.Material.Outlined.Group" Size="Size.Small" />
-                        </span>
-                        <div>
-                            <strong style="font-size: 0.82rem; display: block;">Manage user access</strong>
-                            <p style="font-size: 0.76rem; color: #64748B; margin: 3px 0 8px;">
-                                Inspect accounts, block or unblock users.
-                            </p>
-                            <MudButton Variant="Variant.Outlined" Color="Color.Default" Size="Size.Small" Href="/admin/users">
-                                Browse users
-                            </MudButton>
-                        </div>
-                    </div>
-                </section>
-            </MudItem>
-        </MudGrid>
+    
     }
     else
     {
@@ -253,7 +134,6 @@
 
 @code {
     private UserRecord? _profile;
-    private List<UserRecord> _pendingUsers = new();
     private long _pendingCount;
     private long _activeCount;
     private long _rejectedCount;
@@ -285,7 +165,7 @@
 
             if (Auth.IsActiveAdmin)
             {
-                var pendingTask = UserApi.GetAdminUsersAsync("PENDING_APPROVAL", page: 0, size: 5);
+                var pendingTask = UserApi.GetAdminUsersAsync("PENDING_APPROVAL", page: 0, size: 1);
                 var activeTask = UserApi.GetAdminUsersAsync("ACTIVE", page: 0, size: 1);
                 var rejectedTask = UserApi.GetAdminUsersAsync("REJECTED", page: 0, size: 1);
                 var blockedTask = UserApi.GetAdminUsersAsync("BLOCKED", page: 0, size: 1);
@@ -299,8 +179,7 @@
 
                 if (pendingRes.IsSuccess && pendingRes.Data is not null)
                 {
-                    _pendingUsers = pendingRes.Data.Content;
-                    _pendingCount = pendingRes.Data.TotalElements;
+                            _pendingCount = pendingRes.Data.TotalElements;
                 }
                 else
                 {
@@ -336,7 +215,7 @@
             _isLoading = false;
         }
     }
-    private async Task OpenReviewDialogAsync(string userId)
+    @* private async Task OpenReviewDialogAsync(string userId)
 {
     var parameters = new DialogParameters<UserReviewDialog>
     {
@@ -359,7 +238,7 @@
     {
         await LoadOverviewAsync();
     }
-}
+} *@
 
     private static string GetInitials(UserRecord user)
     {

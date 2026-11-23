@@ -25,12 +25,10 @@ public class AuthState
 
     public bool HasRefreshToken => !string.IsNullOrWhiteSpace(RefreshToken);
 
-    public bool IsAccessTokenValid =>
-        !string.IsNullOrWhiteSpace(AccessToken)
-        && ExpiresAt.HasValue
-        && ExpiresAt.Value > DateTimeOffset.UtcNow.AddSeconds(15);
-
-    public bool IsAuthenticated =>
+   public bool IsAccessTokenValid =>
+    !string.IsNullOrWhiteSpace(AccessToken)
+    && ExpiresAt.HasValue
+    && ExpiresAt.Value > DateTimeOffset.UtcNow.AddSeconds(5);    public bool IsAuthenticated =>
         (!string.IsNullOrWhiteSpace(AccessToken) && ExpiresAt > DateTimeOffset.UtcNow)
         || HasRefreshToken;
 
@@ -123,12 +121,16 @@ public class AuthState
     }
 
     private async Task ClearStorageSafelyAsync()
+{
+    try
     {
-        try
-        {
-            await _js.InvokeVoidAsync("sessionStorage.removeItem", StorageKey);
-        }
-        catch
+        await _js.InvokeVoidAsync("sessionStorage.removeItem", StorageKey);
+        await _js.InvokeVoidAsync("sessionStorage.removeItem", "accessToken");
+        await _js.InvokeVoidAsync("sessionStorage.removeItem", "refreshToken");
+        await _js.InvokeVoidAsync("localStorage.removeItem", "accessToken");
+        await _js.InvokeVoidAsync("localStorage.removeItem", "refreshToken");
+    }
+    catch
         {
             // Ignore storage clear failure
         }
