@@ -10,11 +10,11 @@
 
 <PageTitle>Sign in · Worksync</PageTitle>
 
-<div class="auth-shell auth-card">
+<div class="auth-shell auth-card auth-card-login">
     <div class="text-center">
         <img src="/images/logo.png" alt="WorkSync Logo" class="auth-card-logo" />
-        @* <h1 class="auth-title">Welcome back</h1> *@
-        <p class="auth-subtitle">Signing in </p>
+        <h1 class="auth-title">sign in</h1>
+        @* <p class="auth-subtitle">Signing in </p> *@
     </div>
 
     @if (!string.IsNullOrEmpty(_successMessage))
@@ -79,9 +79,9 @@
         </button>
     </EditForm>
 
-    <p class="auth-footer">
-        Don't have an account? <a href="/register" class="auth-link">sign up</a>
-    </p>
+   <div class="auth-divider">
+    <span>Don't have an account? <a href="/register" class="auth-link">Sign up</a></span>
+</div>
 </div>
 
 @code {

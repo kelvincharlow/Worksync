@@ -62,24 +62,7 @@
                     @(_isRefreshing ? "Checking status…" : "Refresh status")
                 </MudButton>
 
-                @* @if (CurrentStatus == "PENDING_APPROVAL")
-                {
-                    <MudButton Variant="Variant.Outlined"
-                               Color="Color.Primary"
-                               StartIcon="@Icons.Material.Filled.Person"
-                               Href="/profile"
-                               Disabled="@_isRefreshing">
-                        My profile
-                    </MudButton> *@
-                @* }
-
-                <MudButton Variant="Variant.Text"
-                           Color="Color.Error"
-                           StartIcon="@Icons.Material.Filled.Logout"
-                           Disabled="@_isRefreshing"
-                           OnClick="OpenLogoutDialogAsync">
-                    Sign out
-                </MudButton> *@
+               
             </MudStack>
         </MudStack>
     </MudPaper>

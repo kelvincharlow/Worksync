@@ -9,7 +9,7 @@
 
 <MudStack Spacing="4">
     <div class="d-flex justify-space-between align-start flex-wrap gap-3">
-        <div>
+        @* <div>
             <p class="ws-eyebrow">@(Auth.IsActiveAdmin ? "Administration" : "Workspace")</p>
             <h1 class="ws-page-title">Overview</h1>
             <p class="ws-page-desc">
@@ -17,7 +17,7 @@
                     ? "Review access requests and keep user accounts secure."
                     : $"Welcome back, {DisplayFirstName}. Review your workspace account status.")
             </p>
-        </div>
+        </div> *@
 
         @if (Auth.IsActiveAdmin)
         {
@@ -91,45 +91,42 @@
     
     }
     else
-    {
-        <MudGrid Spacing="3">
-            <MudItem xs="12" md="7">
-                <section class="ws-panel pa-6">
-                    <div class="d-flex justify-space-between align-center mb-4">
-                        <h2 style="font-size: 1.05rem; font-weight: 700; margin: 0;">Account details</h2>
-                        <span class="ws-status-pill @(CurrentUser?.Status ?? "ACTIVE")">
-                            @FormatStatus(CurrentUser?.Status ?? "ACTIVE")
-                        </span>
-                    </div>
+{
+    <MudContainer MaxWidth="MaxWidth.Small" Class="mt-4">
+        <MudPaper Elevation="2" Class="pa-6 pa-sm-8" Style="border-radius: 14px;">
+            <MudStack Spacing="4">
+                <div>
+                    <h1 class="mud-typography mud-typography-h4 font-weight-bold mb-1">
+                        Account status
+                    </h1>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Signed in as <strong>@Auth.User?.Email</strong>
+                    </MudText>
+                </div>
 
-                    <MudStack Spacing="2" Class="mb-5">
-                        <MudText Typo="Typo.body2">
-                            <strong>Full name:</strong> @($"{CurrentUser?.FirstName} {CurrentUser?.LastName}".Trim())
-                        </MudText>
-                        <MudText Typo="Typo.body2">
-                            <strong>Email:</strong> @CurrentUser?.Email
-                        </MudText>
-                        <MudText Typo="Typo.body2">
-                            <strong>Phone number:</strong> @CurrentUser?.PhoneNumber
-                        </MudText>
-                        <MudText Typo="Typo.body2">
-                            <strong>System role:</strong> @(CurrentUser?.Role ?? "USER")
-                        </MudText>
-                        <MudText Typo="Typo.body2">
-                            <strong>Registered:</strong> @FormatDate(CurrentUser?.CreatedAt)
-                        </MudText>
-                    </MudStack>
+                <MudAlert Severity="Severity.Success" Variant="Variant.Outlined">
+                    <strong>Account active.</strong> Your account is active and currently awaiting a task and
+                    role assignment from your project manager.
+                </MudAlert>
 
+                @if (!string.IsNullOrWhiteSpace(_errorMessage))
+                {
+                    <MudAlert Severity="Severity.Error" Dense="true">@_errorMessage</MudAlert>
+                }
+
+                <MudStack Row="true" Spacing="2" Class="flex-wrap pt-2">
                     <MudButton Variant="Variant.Filled"
                                Color="Color.Primary"
-                               StartIcon="@Icons.Material.Outlined.PersonOutline"
-                               Href="/profile">
-                        Manage my profile
+                               StartIcon="@Icons.Material.Filled.Refresh"
+                               Disabled="@_isLoading"
+                               OnClick="LoadOverviewAsync">
+                        @(_isLoading ? "Refreshing…" : "Refresh")
                     </MudButton>
-                </section>
-            </MudItem>
-        </MudGrid>
-    }
+                </MudStack>
+            </MudStack>
+        </MudPaper>
+    </MudContainer>
+}
 </MudStack>
 
 @code {
@@ -215,30 +212,6 @@
             _isLoading = false;
         }
     }
-    @* private async Task OpenReviewDialogAsync(string userId)
-{
-    var parameters = new DialogParameters<UserReviewDialog>
-    {
-        { x => x.UserId, userId }
-    };
-
-    var options = new DialogOptions
-    {
-        NoHeader = true,
-        MaxWidth = MaxWidth.Small,
-        FullWidth = true,
-        CloseOnEscapeKey = true,
-        BackdropClick = true,
-        BackgroundClass = "logout-dialog-backdrop"
-    };
-
-    var dialog = await DialogService.ShowAsync<UserReviewDialog>(string.Empty, parameters, options);
-    var result = await dialog.Result;
-    if (result is not null && !result.Canceled)
-    {
-        await LoadOverviewAsync();
-    }
-} *@
 
     private static string GetInitials(UserRecord user)
     {
