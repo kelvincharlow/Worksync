@@ -14,7 +14,7 @@
     <div class="text-center">
         <img src="/images/logo.png" alt="WorkSync Logo" class="auth-card-logo" />
         <h1 class="auth-title">Create your account</h1>
-        <p class="auth-subtitle">Join your workspace. New accounts require administrator approval.</p>
+        @* <p class="auth-subtitle">Join your workspace. New accounts require administrator approval.</p> *@
     </div>
 
     @if (!string.IsNullOrEmpty(_errorMessage))
@@ -25,48 +25,54 @@
     <EditForm EditContext="@_editContext" OnValidSubmit="HandleRegistrationAsync">
         <DataAnnotationsValidator />
 
-        <div class="form-group">
-            <label for="reg-first-name">First name</label>
-            <InputText id="reg-first-name"
-                       class="form-control"
-                       @bind-Value="_register.FirstName"
-                       placeholder="Jane"
-                       autocomplete="given-name" />
-            <ValidationMessage For="@(() => _register.FirstName)" />
+        <div class="form-row-2">
+
+            <div class="form-group">
+                <label for="reg-first-name">First name</label>
+                <InputText id="reg-first-name"
+                        class="form-control"
+                        @bind-Value="_register.FirstName"
+                        placeholder="John"
+                        autocomplete="given-name" />
+                <ValidationMessage For="@(() => _register.FirstName)" />
+            </div>
+
+            <div class="form-group">
+                <label for="reg-last-name">Last name</label>
+                <InputText id="reg-last-name"
+                        class="form-control"
+                        @bind-Value="_register.LastName"
+                        placeholder="Brown"
+                        autocomplete="family-name" />
+                <ValidationMessage For="@(() => _register.LastName)" />
+            </div>
         </div>
 
-        <div class="form-group">
-            <label for="reg-last-name">Last name</label>
-            <InputText id="reg-last-name"
-                       class="form-control"
-                       @bind-Value="_register.LastName"
-                       placeholder="Doe"
-                       autocomplete="family-name" />
-            <ValidationMessage For="@(() => _register.LastName)" />
-        </div>
+         <div class="form-row-2">    
 
-        <div class="form-group">
-            <label for="reg-email">Email address</label>
-            <InputText id="reg-email"
-                       type="email"
-                       class="form-control"
-                       @bind-Value="_register.Email"
-                       placeholder="jane.doe@example.com"
-                       autocomplete="email" />
-            <ValidationMessage For="@(() => _register.Email)" />
-        </div>
+            <div class="form-group">
+                <label for="reg-email">Email address</label>
+                <InputText id="reg-email"
+                        type="email"
+                        class="form-control"
+                        @bind-Value="_register.Email"
+                        placeholder="johnbrown@example.com"
+                        autocomplete="email" />
+                <ValidationMessage For="@(() => _register.Email)" />
+            </div>
 
-        <div class="form-group">
-            <label for="reg-phone">Phone number</label>
-            <InputText id="reg-phone"
-                       type="tel"
-                       class="form-control"
-                       @bind-Value="_register.PhoneNumber"
-                       placeholder="+254712345678"
-                       autocomplete="tel" />
-            <span class="auth-hint">Use international E.164 format (e.g. +254712345678).</span>
-            <ValidationMessage For="@(() => _register.PhoneNumber)" />
-        </div>
+            <div class="form-group">
+                <label for="reg-phone">Phone number</label>
+                <InputText id="reg-phone"
+                        type="tel"
+                        class="form-control"
+                        @bind-Value="_register.PhoneNumber"
+                        placeholder="+254 712345678"
+                        autocomplete="tel" />
+                @* <span class="auth-hint">Use international E.164 format (e.g. +254712345678).</span> *@
+                <ValidationMessage For="@(() => _register.PhoneNumber)" />
+            </div>
+        </div>    
 
         <div class="form-group">
             <label for="reg-password">Password</label>
@@ -85,7 +91,7 @@
                     @(_showPassword ? "Hide" : "Show")
                 </button>
             </div>
-            <span class="auth-hint">Must be 12–128 characters long.</span>
+            @* <span class="auth-hint">Must be 12–128 characters long.</span> *@
             <ValidationMessage For="@(() => _register.Password)" />
         </div>
 

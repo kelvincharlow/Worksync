@@ -13,7 +13,7 @@
 <div class="auth-shell auth-card">
     <div class="text-center">
         <img src="/images/logo.png" alt="WorkSync Logo" class="auth-card-logo" />
-        <h1 class="auth-title">Welcome back</h1>
+        @* <h1 class="auth-title">Welcome back</h1> *@
         <p class="auth-subtitle">Sign in to your WorkSync account</p>
     </div>
 
@@ -36,7 +36,7 @@
                        type="email"
                        class="form-control"
                        @bind-Value="_loginModel.Email"
-                       placeholder="jane.doe@example.com"
+                       placeholder="johnbrown@example.com"
                        autocomplete="username" />
             <ValidationMessage For="@(() => _loginModel.Email)" />
         </div>
@@ -80,7 +80,7 @@
     </EditForm>
 
     <p class="auth-footer">
-        Don't have an account? <a href="/register" class="auth-link">Create one</a>
+        Don't have an account? <a href="/register" class="auth-link">sign up</a>
     </p>
 </div>
 
