@@ -227,12 +227,14 @@ public class AuthService {
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
-                public void afterCommit() {
-                    nonTransactionalTemplate.executeWithoutResult(status -> sendConfirmationSafely(req.email()));
+                public void afterCompletion(int status) {
+                    if (status == TransactionSynchronization.STATUS_COMMITTED) {
+                        nonTransactionalTemplate.executeWithoutResult(txStatus -> sendConfirmationSafely(req.email()));
+                    }
                 }
             });
         } else {
-            nonTransactionalTemplate.executeWithoutResult(status -> sendConfirmationSafely(req.email()));
+            nonTransactionalTemplate.executeWithoutResult(txStatus -> sendConfirmationSafely(req.email()));
         }
 
         return new MessageResponse("Password has been successfully reset. You can now log in with your new password.");
