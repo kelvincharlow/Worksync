@@ -64,7 +64,7 @@ class ProjectFoundationIntegrationTests {
         assertThat(projects.findById(p.getId())).get().extracting(Project::getOwnerUserId).isEqualTo(owner);
         assertThat(access.getMemberAccess(p.getId(),owner).isOwner()).isTrue();
         assertThat(p.getCreatedAt()).isNotNull();
-        assertThat(ProjectResponse.from(p).ownerUserId()).isEqualTo(owner);
+        assertThat(ProjectResponse.from(p, ProjectPermissionsResponse.initialOwner()).ownerUserId()).isEqualTo(owner);
         assertThat(ProjectMemberResponse.from(members.findByProjectIdAndUserId(p.getId(),owner).orElseThrow()).role()).isEqualTo(ProjectRole.MANAGER);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE version='5' AND success",Integer.class)).isEqualTo(1);
     }
@@ -127,10 +127,10 @@ class ProjectFoundationIntegrationTests {
         access.requireAction(p.getId(),owner,ProjectAction.VIEW_INTERNAL_WORK);
         assertThatThrownBy(() -> access.requireAction(p.getId(),owner,ProjectAction.CREATE_TASK)).isInstanceOf(ProjectArchivedException.class);
     }
-    @Test void projectCreationIsFailClosedAndLeavesNoRecords() {
+    @Test void projectCreationWithoutPermissionLeavesNoRecords() {
         UUID owner=user("ACTIVE");
         assertThatThrownBy(() -> service.createProject(owner,new CreateProjectRequest("Project",null,null,null,null,null,null,null)))
-                .isInstanceOf(ProjectCreationUnavailableException.class);
+                .isInstanceOf(com.eclectics.worksync.users.exception.OrganizationPermissionDeniedException.class);
         assertThat(projects.count()).isZero();assertThat(members.count()).isZero();
     }
     @Test void upgradesExistingV4SchemaWithoutLosingUsers() {

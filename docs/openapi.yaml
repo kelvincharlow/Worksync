@@ -13,8 +13,9 @@ info:
     Auth-owned operation definitions below remain draft contracts; see
     docs/api-contract.md for the existing password-reset path mismatch.
 
-    Modules 2/3 (V13 agreement): all Projects, Work Items and Bugs operations are
-    planned, not implemented. See docs/api-contract.md for authority rules and
+    Modules 2/3 (V13 agreement): POST /projects is implemented on feature/projects-create-api,
+    not yet main; other Projects,
+    Work Items and Bugs HTTP operations remain planned. See docs/api-contract.md for authority rules and
     explicitly unresolved/proposed choices; x-contract-decision marks proposals.
     Existing Module 1 operations and behavior are unchanged.
 
@@ -24,7 +25,8 @@ info:
     - Public self-registration with first name, last name, email, phone number,
       and password. Accounts begin as PENDING_APPROVAL with system role USER.
     - Administrator approval/rejection/block/unblock endpoints are implemented.
-      Users V7 implements direct PROJECT_CREATE grant replacement; project creation integration remains disabled.
+      Users V7 PROJECT_CREATE grants and V5/V6 foundations are merged; POST /projects is implemented
+      on feature/projects-create-api, not yet main. Other Projects endpoints remain planned.
     - Updated main SecurityConfig allows PENDING_APPROVAL users to GET and PUT
       /users/me. /api/v1/notifications/** requires STATUS_ACTIVE; pending users
       cannot access notifications. Administrator routes require ROLE_ADMIN and
@@ -692,13 +694,16 @@ paths:
       - Projects
       operationId: createProject
       summary: Create private project
-      x-implementation-status: planned
-      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
-        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
-        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
-        returns 403. Authorization: ACTIVE + explicitly granted PROJECT_CREATE; no automatic ADMIN bypass. Create
-        owner designation and initial MANAGER membership in the same transaction. Organization permission persistence/grant
-        endpoint remains a Module 1 dependency, not implemented here.'
+      x-implementation-status: implemented
+      description: 'Requires authenticated, currently ACTIVE account with an explicit PROJECT_CREATE grant.
+        ADMIN alone is insufficient. The Users guard checks fresh database state under its lifecycle advisory lock
+        inside the same writable READ_COMMITTED transaction that inserts the Project and Owner MANAGER membership.
+        Owner and creator come only from the verified principal. Unknown request fields are rejected.
+        Text properties require actual JSON strings; numeric/boolean coercion and explicit null text values are rejected.
+        Optional text fields may be omitted; dates may be omitted or null.
+        Temporary initial permissions have role MANAGER, responsibility null, isOwner true and empty actions.
+        Optional enabledViews and enabledWorkTypes are empty; Overview/Planning remain mandatory.
+        These response-only defaults do not enable work functionality. Configurable-feature policy requires later review.'
       security:
       - BearerAuth: []
       x-authorization: ACTIVE + explicitly granted PROJECT_CREATE; no automatic ADMIN bypass.
