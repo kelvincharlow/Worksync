@@ -1,10 +1,9 @@
 # Module 1 API contract
 
-**Status: Auth is implemented in main; Users Step 5B Parts 1 and 2 are implemented
-on the current `feature/users-admin-actions` branch.** Part 1 provides profile and
+**Status: Auth and Users Step 5B Parts 1 and 2 are implemented in main.** Part 1 provides profile and
 administrator reads; Part 2 adds approval, rejection and block/unblock endpoints.
 Auth registration, login and password-reset behavior is reused unchanged.
-Future role/permission management and in-app Notifications endpoints remain planned.
+Users V7 implements direct PROJECT_CREATE permission replacement. Future role management and in-app Notifications endpoints remain planned.
 
 [openapi.yaml](openapi.yaml) records the supplied OpenAPI 3.0.3 contract, version 0.2.0. It is the detailed schema reference for review. [Contract review notes](module1-contract-review-notes.md) record the supplied scope and security considerations. Agree changes in a pull request before implementing controllers or frontend clients.
 
@@ -18,26 +17,26 @@ Base URL: `http://localhost:8080/api/v1`. JSON requests/responses. The implement
 | IMPLEMENTED — MAIN (AUTH) | POST /auth/login | Auth-owned; public; 200 accessToken, tokenType, expiresIn and safe user |
 | IMPLEMENTED — MAIN (AUTH) | POST /auth/forgot-password | Auth-owned reset-code request; draft path mismatch below |
 | IMPLEMENTED — MAIN (AUTH) | POST /auth/reset-password | Auth-owned reset confirmation; draft path mismatch below |
-| IMPLEMENTED — USERS FEATURE BRANCH | GET /users/me | Own profile; ACTIVE or PENDING_APPROVAL |
-| IMPLEMENTED — USERS FEATURE BRANCH | PUT /users/me | Update own names and phone number only; ACTIVE or PENDING_APPROVAL |
-| IMPLEMENTED — USERS FEATURE BRANCH | GET /admin/users | ACTIVE ADMIN; optional status filter and pagination |
-| IMPLEMENTED — USERS FEATURE BRANCH | GET /admin/users/{userId} | ACTIVE ADMIN; retrieve one account; 404 if absent |
-| IMPLEMENTED — USERS FEATURE BRANCH | PATCH /admin/users/{userId}/approve | ACTIVE ADMIN; PENDING_APPROVAL → ACTIVE |
-| IMPLEMENTED — USERS FEATURE BRANCH | PATCH /admin/users/{userId}/reject | ACTIVE ADMIN; PENDING_APPROVAL → REJECTED; optional reason |
-| IMPLEMENTED — USERS FEATURE BRANCH | PATCH /admin/users/{userId}/status | ACTIVE ADMIN; ACTIVE ↔ BLOCKED; never a substitute for approval |
+| IMPLEMENTED — MAIN (USERS STEP 5B) | GET /users/me | Own profile; ACTIVE or PENDING_APPROVAL |
+| IMPLEMENTED — MAIN (USERS STEP 5B) | PUT /users/me | Update own names and phone number only; ACTIVE or PENDING_APPROVAL |
+| IMPLEMENTED — MAIN (USERS STEP 5B) | GET /admin/users | ACTIVE ADMIN; optional status filter and pagination |
+| IMPLEMENTED — MAIN (USERS STEP 5B) | GET /admin/users/{userId} | ACTIVE ADMIN; retrieve one account; 404 if absent |
+| IMPLEMENTED — MAIN (USERS STEP 5B) | PATCH /admin/users/{userId}/approve | ACTIVE ADMIN; PENDING_APPROVAL → ACTIVE |
+| IMPLEMENTED — MAIN (USERS STEP 5B) | PATCH /admin/users/{userId}/reject | ACTIVE ADMIN; PENDING_APPROVAL → REJECTED; optional reason |
+| IMPLEMENTED — MAIN (USERS STEP 5B) | PATCH /admin/users/{userId}/status | ACTIVE ADMIN; ACTIVE ↔ BLOCKED; never a substitute for approval |
 | PLANNED | GET /notifications | ACTIVE only; own notifications; PENDING_APPROVAL denied |
 | PLANNED | PATCH /notifications/{notificationId}/read | ACTIVE only; own notification only; 200 updated NotificationRecord |
 | PLANNED — LATER | POST /auth/logout | Actually revoke presented JWT; 204 only after revocation |
-| PLANNED — LATER | PATCH /admin/users/{userId}/permissions | Replace additional organization-level permission grants |
+| IMPLEMENTED — USERS V7 FEATURE BRANCH | PATCH /admin/users/{userId}/permissions | ACTIVE ADMIN replaces direct grants; stored/effective permissions returned |
 | PLANNED — LATER | PATCH /admin/users/{userId}/role | Change system role under high-trust administrator policy |
 
-In-app notification endpoints remain planned. The YAML explicitly marks the three later operations with `x-implementation-phase: later`.
+In-app notification endpoints remain planned. The YAML explicitly marks the remaining logout and system-role operations with `x-implementation-phase: later`.
 
 ## Implemented Users behavior
 
 See [Users REST endpoints](users-rest-endpoints.md) for the exact security and response contract.
 The implemented single-user operations return UserResponse: UUID id, firstName, lastName, email,
-phoneNumber, role, status, createdAt and updatedAt. No permissions or credentials.
+phoneNumber, role, status, createdAt, updatedAt, stored permissions and derived effectivePermissions. No credentials.
 The administrator list wraps these in content/page/size/totalElements (`UserPageResponse`
 in Java, `PagedUsers` in OpenAPI). Its optional `status` filter uses AccountStatus;
 `page` defaults to 0 (minimum 0), and `size` defaults to 20 (range 1–100).
@@ -116,7 +115,7 @@ review does not rename either route or change Auth-owned endpoint contracts.
 - Login accepts email/password. AuthResponse contains accessToken, tokenType `Bearer`, expiresIn in seconds and a safe user. The example 900-second lifetime is illustrative. Pending users can obtain tokens but remain restricted by the backend. BLOCKED/REJECTED accounts cannot obtain tokens.
 - The draft UserRecord (used by other planned contracts) contains opaque string id, firstName, lastName, email, phoneNumber, **role** (singular), status, permissions and createdAt; updatedAt is optional. IDs are strings, not a UUID contract. Passwords and hashes never appear in responses.
 - Profile PUT requires firstName, lastName and phoneNumber. It cannot change email, role, status or permission grants. Email changes require a later verification flow.
-- Account statuses: PENDING_APPROVAL, ACTIVE, REJECTED, BLOCKED. System roles: USER, ADMIN. Additional organization permissions are planned, not implemented by Step 5B; the draft proposes unique strings, initially PROJECT_CREATE, with no automatic grant on approval. Project roles are separate future memberships.
+- Account statuses: PENDING_APPROVAL, ACTIVE, REJECTED, BLOCKED. System roles: USER, ADMIN. Users V7 implements named organization grants, initially PROJECT_CREATE, with no automatic grant on approval; Step 5B did not implement these grants. Project roles are separate future memberships.
 - List responses contain **content**, page, size and totalElements. Pages are zero-based; size defaults to 20 and is bounded to 1–100. User lists support an account status filter; notifications support READ/UNREAD status.
 - NotificationRecord contains id, type, title, message, status and createdAt, with optional nullable readAt. Types: ACCOUNT_REGISTERED, ACCOUNT_APPROVED, ACCOUNT_REJECTED, ACCOUNT_BLOCKED and GENERAL. Another user's notification cannot be read or modified through these endpoints; a read-update attempt returns 404 when missing/not owned.
 - The draft proposes errors using **application/json** with code, message and timestamp, plus optional fieldErrors containing field/message pairs. This replaces the earlier Problem Details proposal. Never include passwords, hashes, SQL or stack traces.
@@ -368,8 +367,9 @@ Agreed security invariants above apply regardless of eventual vocabulary.
   proposals, not claimed V13 decisions. Preference whitelists above
   are now defined. Completion calculation, approval persistence/revocation and
   client-safe milestone publication mechanics remain planned decisions.
-- PROJECT_CREATE grant persistence/API remains the separately planned Users
-  permission work. No blanket project creation until it is securely implemented.
+- Users V7 now implements PROJECT_CREATE persistence/API on its feature branch;
+  Projects integration and shared-database V6/V7 rollout remain pending. Creation
+  stays disabled until the Projects integration PR uses the transactional guard.
 - Inactive-owner recovery, member removal with assignments, exact cross-module
   Java signatures/packages, and shared Flyway version allocation remain open.
   Current main has V1/V3/V4; no numbers are reserved or migrations changed here.
@@ -427,3 +427,20 @@ operation-specific authorization rule.
 ### Added M2/M3 schemas
 
 `AddProjectMemberRequest`, `AssignBugVerifierRequest`, `AssignWorkItemRequest`, `BugHistoryPageResponse`, `BugHistoryResponse`, `BugPageResponse`, `BugResponse`, `BugSeverity`, `BugStatus`, `BugTriageOutcome`, `ClientDeliveryStatus`, `ClientDeliverySummaryResponse`, `ClientMilestonePageResponse`, `ClientMilestoneResponse`, `ClientWorkProgressSummary`, `CreateMilestoneRequest`, `CreateProjectRequest`, `CreateSubtaskRequest`, `CreateWorkItemLinkRequest`, `CreateWorkItemRequest`, `EffectiveProjectPermissionsResponse`, `InternalProjectPermissionsResponse`, `ViewerProjectPermissionsResponse`, `MilestonePageResponse`, `MilestoneResponse`, `MilestoneStatus`, `OrdinaryWorkItemResponse`, `ProjectAction`, `ProjectConfigurationResponse`, `ProjectLandingPage`, `ProjectMemberPageResponse`, `ProjectMemberResponse`, `ProjectOverviewResponse`, `ProjectPageResponse`, `ProjectPreferenceFields`, `ProjectPreferenceResponse`, `ProjectResponse`, `ProjectResponsibility`, `ProjectRole`, `ProjectStatus`, `ProjectSummaryResponse`, `ProjectView`, `ReportBugRequest`, `SubmitBugFixRequest`, `TransferOwnershipRequest`, `TriageBugRequest`, `UpdateMilestoneRequest`, `UpdateProjectConfigurationRequest`, `UpdateProjectMemberRequest`, `UpdateProjectPreferenceRequest`, `UpdateProjectRequest`, `UpdateWorkItemRequest`, `VerificationResult`, `VerifyBugRequest`, `WorkItemLinkResponse`, `WorkItemLinkType`, `WorkItemPageResponse`, `WorkItemPriority`, `WorkItemResponse`, `WorkItemStatus`, `WorkItemSummaryResponse`, `WorkItemType`.
+
+
+## Users V7 organization permissions
+
+See [Users permissions](users-permissions.md) for persistence, the Admin replacement
+API and future Projects transaction contract. V7 is implemented on
+`feature/users-project-create-permission-v7`; ProjectService remains unchanged
+and disabled. V6 is absent on this branch and belongs to Phoebe. Disposable tests
+can apply V1/V3/V4/V5/V7 with a gap, but shared rollout must coordinate V6 before
+V7; do not backfill an invented migration, renumber or enable out-of-order silently.
+
+Compatibility clarification: the legacy draft permission route used an opaque
+UserId example and omitted 409. The implemented route uses actual Users UUIDs and
+returns 409 INVALID_PERMISSION_TARGET when an inactive target would receive a NEW
+grant. All existing response fields remain; permissions and effectivePermissions
+are additive. Revoke inactive targets with an empty array; unchanged stored grants
+may remain, but never confer effective access while inactive.

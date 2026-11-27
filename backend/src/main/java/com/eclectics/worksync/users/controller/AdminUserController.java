@@ -3,6 +3,7 @@ package com.eclectics.worksync.users.controller;
 import com.eclectics.worksync.auth.security.WorkSyncPrincipal;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import com.eclectics.worksync.users.dto.ReasonRequest;
+import com.eclectics.worksync.users.dto.UpdatePermissionsRequest;
 import com.eclectics.worksync.users.dto.ChangeAccountStatusRequest;
 import com.eclectics.worksync.users.dto.UserPageResponse;
 import jakarta.validation.Valid;
@@ -73,6 +74,12 @@ public class AdminUserController {
         return "BLOCKED".equals(request.status())
                 ? userService.blockUser(actorId(principal), userId)
                 : userService.unblockUser(actorId(principal), userId);
+    }
+
+    @PatchMapping("/{userId}/permissions")
+    public UserResponse replacePermissions(@AuthenticationPrincipal WorkSyncPrincipal principal,
+            @PathVariable UUID userId, @Valid @RequestBody UpdatePermissionsRequest request) {
+        return userService.updatePermissions(actorId(principal), userId, request);
     }
 
     private UUID actorId(WorkSyncPrincipal principal) {
