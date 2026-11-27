@@ -65,7 +65,7 @@ class ProjectFoundationIntegrationTests {
         assertThat(access.getMemberAccess(p.getId(),owner).isOwner()).isTrue();
         assertThat(p.getCreatedAt()).isNotNull();
         assertThat(ProjectResponse.from(p, ProjectPermissionsResponse.initialOwner()).ownerUserId()).isEqualTo(owner);
-        assertThat(ProjectMemberResponse.from(members.findByProjectIdAndUserId(p.getId(),owner).orElseThrow()).role()).isEqualTo(ProjectRole.MANAGER);
+        assertThat(ProjectMemberResponse.from(members.findByProjectIdAndUserId(p.getId(),owner).orElseThrow(), "Test User", owner).role()).isEqualTo(ProjectRole.MANAGER);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE version='5' AND success",Integer.class)).isEqualTo(1);
     }
     @Test void incompleteOwnerTransactionCannotCommit() {

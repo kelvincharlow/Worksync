@@ -136,8 +136,9 @@ its sample Git commands, Java file lists and deployment procedures are context,
 not instructions to implement modules or release them in this change.
 
 OpenAPI version **0.3.0**, specification **3.0.3**, adds Projects (M2, Kelvin) and
-Work Items/Bugs (M3, Phoebe). POST `/projects` is now implemented on
-`feature/projects-create-api`; other M2/M3 HTTP operations remain planned. Existing Module 1 paths, operations, schemas,
+Work Items/Bugs (M3, Phoebe). POST `/projects` is merged into main. Eligible-user lookup
+and GET/POST project memberships are implemented on `feature/projects-team-management`;
+other M2/M3 HTTP operations remain planned. Existing Module 1 paths, operations, schemas,
 error definitions and public Auth security overrides are preserved. The earlier
 Module 1 sections above describe that baseline. This creation slice does not implement
 other M2/M3 endpoints, feature configuration, frontend screens or deployment changes.
@@ -375,7 +376,7 @@ Agreed security invariants above apply regardless of eventual vocabulary.
 - Home-wide invitations/assignments, calendar/Gantt, advanced Scrum, custom roles,
   workflow customization, automation, files and integrations remain deferred.
 
-### M2/M3 operation inventory (creation implemented; other routes planned)
+### M2/M3 operation inventory (see operation-level implementation markers)
 
 All paths below are relative to `/api/v1`; `{projectId}` consistently names the
 agreement's project `{id}`. The YAML contains each request, response, error and
@@ -433,9 +434,8 @@ operation-specific authorization rule.
 See [Users permissions](users-permissions.md) for persistence, the Admin replacement
 API and Projects transaction contract. V5 Projects foundation, V6 Work Items foundation
 and V7 organization permissions (including PROJECT_CREATE) are merged into main.
-POST `/api/v1/projects` is implemented on `feature/projects-create-api` and is not yet
-merged into main. It creates the creator's designated Owner/MANAGER membership
-automatically. Eligible-user selection and membership management remain planned.
+POST `/api/v1/projects` is merged into main through PR #17. It creates the creator's designated Owner/MANAGER membership
+automatically. Eligible-user selection and membership GET/POST are implemented on the current team-management branch; membership updates/removal remain planned.
 Existing migrations are preserved; the verified sequence is V1/V3/V4/V5/V6/V7.
 
 Compatibility clarification: the legacy draft permission route used an opaque
@@ -466,11 +466,72 @@ remain mandatory. No configurable-feature persistence, additional permission gra
 Work Item functionality is enabled. Only currently implemented project API capabilities
 may be advertised; no follow-on project actions are advertised yet. The configurable-feature
 policy remains pending team review. These creation-only defaults must not be reused as a
-general authorization projection for future project read/member APIs. No membership
-management, project update/archive or frontend endpoints are included.
+general authorization projection for future project read/member APIs. This creation slice did not include membership management, project update/archive or frontend endpoints; see the team-management slice below.
 
 Project creation tests include a real deferred Owner/MANAGER foreign-key failure at
 outer commit, not only a simulated repository exception. The complete populated
 response shape and nested creation defaults are asserted. Automated evaluation of
 responses against the entire OpenAPI schema remains a follow-up; no new generic
 schema-validation infrastructure is introduced in this slice.
+
+## Project team management — feature/projects-team-management
+
+POST `/projects` is merged through PR #17. The following additions are implemented
+on the team-management feature branch only; membership PATCH/DELETE, ownership
+transfer, project archive/update and frontend work remain planned:
+
+| Endpoint | Authorization and behavior |
+| --- | --- |
+| GET `/projects/{projectId}/eligible-users` | Current ACTIVE Owner/MANAGER; archived project 409; excludes all existing members in PostgreSQL |
+| POST `/projects/{projectId}/members` | Owner adds MANAGER/MEMBER/VIEWER; additional MANAGER adds MEMBER/VIEWER only; 201 safe member response |
+| GET `/projects/{projectId}/members` | ACTIVE Owner/MANAGER and MEMBER; VIEWER denied; archived team remains readable |
+
+All actor identities come from WorkSyncPrincipal. ADMIN and PROJECT_CREATE grants
+alone never provide project access. Unknown/non-disclosable projects return 404;
+known participants lacking capability return 403. Bad request/UUID/pagination data
+returns 400. Archived writes, duplicate memberships and missing/inactive targets
+return safe 409 without disclosing target account details. MEMBER requires one
+TECHNICAL_LEAD/DEVELOPER/QA_TESTER responsibility; MANAGER/VIEWER require none.
+Unknown body properties, including ownership fields, are rejected. Owner designation
+is never changed. Member responses follow the agreed fields plus additive `isOwner`;
+no email, phone, account status or credentials appear in internal team responses.
+
+### Deliberate lookup dependency
+
+Users owns UserSelection (id, firstName, lastName, email), bounded ACTIVE search,
+and user repository access. No general public or authenticated directory endpoint
+is exposed. Projects authorizes Owner/MANAGER access before calling Users. The
+explicitly approved read-only Users query references the existing V5 table
+`project_members(project_id,user_id)` using NOT EXISTS. This deliberate SQL schema
+coupling avoids loading all users/members and permits identical ACTIVE/search/
+exclusion predicates for page content and totalElements. Renaming that Projects
+schema requires coordination with Users. There is no cross-domain repository access,
+JPA relationship or new migration. Search is optional, trimmed/case-insensitive literal
+full-name/email substring matching (max 100); % and _ are literal. Ordering is fixed
+lower(last_name), lower(first_name), id ASC. Pages are zero-based, size 1–100, default 20.
+
+Team pages use createdAt DESC,userId DESC and batch-load safe display names only for
+that page's users, including inactive existing members. Membership is not silently
+removed when an account is blocked. The agreed policy permits current ACTIVE
+Project Owners, MANAGERs and MEMBERs to view the internal team directory. VIEWERs
+must not access it. Eligible-user search remains restricted to Owner/MANAGER.
+
+### Account lifecycle concurrency
+
+Additions run in one writable READ_COMMITTED transaction. A trusted Users lookup
+write guard joins it with MANDATORY propagation, reuses the exact V7 lifecycle
+advisory lock, and checks current ACTIVE actor state using a scalar query. Projects
+then locks/refetches the Project row and rechecks membership/Owner rules. A fresh
+ACTIVE target query occurs under the same Users lock before insertion. All locks
+remain until outer commit/rollback. Blocking winning the lock prevents an addition;
+a successful insertion winning the lock commits before blocking can finish. Existing
+V7 permission checks and lock semantics remain unchanged. The existing unique
+project/user constraint remains authoritative for concurrent duplicates. No existing
+migration, Auth, Notifications, Work Items or frontend behavior is modified.
+
+Team endpoint pagination is validated before repository access. The supported offset
+is `(long) page * size <= 2147483647`, with page >= 0 and size 1–100. Unsupported
+offsets return safe 400 INVALID_PROJECT_REQUEST; the exact maximum offset is accepted
+(e.g. page=2147483647,size=1) and returns an empty page with the matching total when
+beyond the available rows. These bounds apply only to the team endpoints and the
+Users directory helper; no unrelated pagination behavior is changed.

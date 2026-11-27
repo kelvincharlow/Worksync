@@ -8,7 +8,7 @@ import java.util.List;
 public record ProjectPermissionsResponse(ProjectRole role, ProjectResponsibility responsibility,
         boolean isOwner, List<String> actions, InitialProjectConfiguration configuration) {
     public static ProjectPermissionsResponse initialOwner() {
-        // No project read/edit/member/work-item HTTP APIs are implemented in this slice.
+        // No Work Item actions are exposed by these Projects slices; team APIs do not enable work features.
         return new ProjectPermissionsResponse(ProjectRole.MANAGER, null, true, List.of(),
                 new InitialProjectConfiguration(List.of(), List.of()));
     }
