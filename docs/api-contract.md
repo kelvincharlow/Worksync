@@ -5,7 +5,7 @@ administrator reads; Part 2 adds approval, rejection and block/unblock endpoints
 Auth registration, login and password-reset behavior is reused unchanged.
 Users V7 implements direct PROJECT_CREATE permission replacement. Future role management and in-app Notifications endpoints remain planned.
 
-[openapi.yaml](openapi.yaml) records the supplied OpenAPI 3.0.3 contract, version 0.2.0. It is the detailed schema reference for review. [Contract review notes](module1-contract-review-notes.md) record the supplied scope and security considerations. Agree changes in a pull request before implementing controllers or frontend clients.
+[openapi.yaml](openapi.yaml) records the supplied OpenAPI 3.0.3 contract, version 0.3.0. It is the detailed schema reference for review. [Contract review notes](module1-contract-review-notes.md) record the supplied scope and security considerations. Agree changes in a pull request before implementing controllers or frontend clients.
 
 ## Endpoint scope
 
@@ -27,7 +27,7 @@ Base URL: `http://localhost:8080/api/v1`. JSON requests/responses. The implement
 | PLANNED | GET /notifications | ACTIVE only; own notifications; PENDING_APPROVAL denied |
 | PLANNED | PATCH /notifications/{notificationId}/read | ACTIVE only; own notification only; 200 updated NotificationRecord |
 | PLANNED — LATER | POST /auth/logout | Actually revoke presented JWT; 204 only after revocation |
-| IMPLEMENTED — USERS V7 FEATURE BRANCH | PATCH /admin/users/{userId}/permissions | ACTIVE ADMIN replaces direct grants; stored/effective permissions returned |
+| IMPLEMENTED — MAIN (USERS V7) | PATCH /admin/users/{userId}/permissions | ACTIVE ADMIN replaces direct grants; stored/effective permissions returned |
 | PLANNED — LATER | PATCH /admin/users/{userId}/role | Change system role under high-trust administrator policy |
 
 In-app notification endpoints remain planned. The YAML explicitly marks the remaining logout and system-role operations with `x-implementation-phase: later`.
@@ -136,11 +136,11 @@ its sample Git commands, Java file lists and deployment procedures are context,
 not instructions to implement modules or release them in this change.
 
 OpenAPI version **0.3.0**, specification **3.0.3**, adds Projects (M2, Kelvin) and
-Work Items/Bugs (M3, Phoebe). Every new operation has
-`x-implementation-status: planned`. Existing Module 1 paths, operations, schemas,
+Work Items/Bugs (M3, Phoebe). POST `/projects` is now implemented on
+`feature/projects-create-api`; other M2/M3 HTTP operations remain planned. Existing Module 1 paths, operations, schemas,
 error definitions and public Auth security overrides are preserved. The earlier
-Module 1 sections above describe that baseline; this extension does not implement
-permissions, controllers, persistence, frontend screens or deployment changes.
+Module 1 sections above describe that baseline. This creation slice does not implement
+other M2/M3 endpoints, feature configuration, frontend screens or deployment changes.
 
 ### Shared authorization and architecture
 
@@ -367,16 +367,15 @@ Agreed security invariants above apply regardless of eventual vocabulary.
   proposals, not claimed V13 decisions. Preference whitelists above
   are now defined. Completion calculation, approval persistence/revocation and
   client-safe milestone publication mechanics remain planned decisions.
-- Users V7 now implements PROJECT_CREATE persistence/API on its feature branch;
-  Projects integration and shared-database V6/V7 rollout remain pending. Creation
-  stays disabled until the Projects integration PR uses the transactional guard.
+- V5/V6/V7 are merged. POST `/projects` now uses the transactional Users PROJECT_CREATE guard;
+  creation atomically inserts the Project and creator Owner/MANAGER membership.
 - Inactive-owner recovery, member removal with assignments, exact cross-module
   Java signatures/packages, and shared Flyway version allocation remain open.
-  Current main has V1/V3/V4; no numbers are reserved or migrations changed here.
+  Main contains V1/V3/V4/V5/V6/V7; no migration is changed by this creation slice.
 - Home-wide invitations/assignments, calendar/Gantt, advanced Scrum, custom roles,
   workflow customization, automation, files and integrations remain deferred.
 
-### Planned M2/M3 operation inventory
+### M2/M3 operation inventory (creation implemented; other routes planned)
 
 All paths below are relative to `/api/v1`; `{projectId}` consistently names the
 agreement's project `{id}`. The YAML contains each request, response, error and
@@ -432,11 +431,12 @@ operation-specific authorization rule.
 ## Users V7 organization permissions
 
 See [Users permissions](users-permissions.md) for persistence, the Admin replacement
-API and future Projects transaction contract. V7 is implemented on
-`feature/users-project-create-permission-v7`; ProjectService remains unchanged
-and disabled. V6 is absent on this branch and belongs to Phoebe. Disposable tests
-can apply V1/V3/V4/V5/V7 with a gap, but shared rollout must coordinate V6 before
-V7; do not backfill an invented migration, renumber or enable out-of-order silently.
+API and Projects transaction contract. V5 Projects foundation, V6 Work Items foundation
+and V7 organization permissions (including PROJECT_CREATE) are merged into main.
+POST `/api/v1/projects` is implemented on `feature/projects-create-api` and is not yet
+merged into main. It creates the creator's designated Owner/MANAGER membership
+automatically. Eligible-user selection and membership management remain planned.
+Existing migrations are preserved; the verified sequence is V1/V3/V4/V5/V6/V7.
 
 Compatibility clarification: the legacy draft permission route used an opaque
 UserId example and omitted 409. The implemented route uses actual Users UUIDs and
@@ -444,3 +444,33 @@ returns 409 INVALID_PERMISSION_TARGET when an inactive target would receive a NE
 grant. All existing response fields remain; permissions and effectivePermissions
 are additive. Revoke inactive targets with an empty array; unchanged stored grants
 may remain, but never confer effective access while inactive.
+
+### Project creation implementation
+
+POST `/api/v1/projects` returns 201 and the agreed ProjectResponse. Actor identity comes
+only from WorkSyncPrincipal. ACTIVE status and a current direct PROJECT_CREATE grant
+are checked by Users.requirePermissionForWrite inside an outer writable READ_COMMITTED
+transaction, before Projects writes. ADMIN alone grants no creation authority. Revocation
+is serialized by the existing Users lifecycle lock, held through Project/membership commit.
+Validation rejects unknown properties, non-string JSON values for all text fields,
+blank/overlong names and reversed date ranges. Optional text fields may be omitted;
+explicit null text values are rejected, matching their non-nullable OpenAPI definitions.
+Dates may be omitted or null and retain the existing date parsing rules.
+Safe responses use 400 for invalid bodies, 401 for unauthenticated callers, 403 for
+missing effective permission (pending accounts receive 403; Auth rejects blocked/rejected tokens with 401), and 409 for persistence conflicts after rollback.
+
+Initial creation response defaults are temporary and explicitly approved for this slice:
+`permissions.role=MANAGER`, `responsibility=null`, `isOwner=true`, `actions=[]`,
+`configuration.enabledViews=[]`, `configuration.enabledWorkTypes=[]`. Overview and Planning
+remain mandatory. No configurable-feature persistence, additional permission grants or
+Work Item functionality is enabled. Only currently implemented project API capabilities
+may be advertised; no follow-on project actions are advertised yet. The configurable-feature
+policy remains pending team review. These creation-only defaults must not be reused as a
+general authorization projection for future project read/member APIs. No membership
+management, project update/archive or frontend endpoints are included.
+
+Project creation tests include a real deferred Owner/MANAGER foreign-key failure at
+outer commit, not only a simulated repository exception. The complete populated
+response shape and nested creation defaults are asserted. Automated evaluation of
+responses against the entire OpenAPI schema remains a follow-up; no new generic
+schema-validation infrastructure is introduced in this slice.

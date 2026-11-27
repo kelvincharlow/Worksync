@@ -2,9 +2,8 @@ package com.eclectics.worksync.projects.service;
 
 import com.eclectics.worksync.projects.dto.*;
 import com.eclectics.worksync.projects.entity.*;
-import com.eclectics.worksync.projects.exception.*;
 import com.eclectics.worksync.projects.repository.*;
-import com.eclectics.worksync.users.entity.AccountStatus;
+import com.eclectics.worksync.users.entity.OrganizationPermission;
 import com.eclectics.worksync.users.service.UserService;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validator;
@@ -23,8 +22,8 @@ public class ProjectService {
     public ProjectService(ProjectRepository projects, ProjectMemberRepository members, UserService users, Validator validator) {
         this.projects = projects; this.members = members; this.users = users; this.validator = validator;
     }
-    /** No HTTP endpoint. Fail closed until V7 adds a database-backed Users permission guard.
-     * When connected, that guard must participate in this transaction and serialize against revocation.
+    /** The Users guard joins this writable transaction and holds its lifecycle lock until commit.
+     * Always acquire it before inserting/locking Projects rows, so revocation is serialized.
      */
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public ProjectResponse createProject(UUID actorUserId, CreateProjectRequest request) {
@@ -32,16 +31,11 @@ public class ProjectService {
         Objects.requireNonNull(request, "request is required");
         var violations = validator.validate(request);
         if (!violations.isEmpty()) throw new ConstraintViolationException(violations);
-        if (users.getUserById(actorUserId).status() != AccountStatus.ACTIVE) throw new ProjectAccessDeniedException();
-        requireProjectCreatePermission();
+        users.requirePermissionForWrite(actorUserId, OrganizationPermission.PROJECT_CREATE);
         Project project = projects.saveAndFlush(new Project(actorUserId, request.name(), request.description(),
                 request.requirements(), request.scope(), request.deliverables(), request.successCriteria(),
                 request.startDate(), request.dueDate()));
         members.saveAndFlush(new ProjectMember(project.getId(), actorUserId, ProjectRole.MANAGER, null));
-        return ProjectResponse.from(project);
-    }
-    private void requireProjectCreatePermission() {
-        // Deliberate hard stop, not a fake grant, JWT check, test override or ADMIN bypass.
-        throw new ProjectCreationUnavailableException();
+        return ProjectResponse.from(project, ProjectPermissionsResponse.initialOwner());
     }
 }
