@@ -19,7 +19,6 @@ public record WorkItemResponse(
     UUID creatorId,
     UUID assigneeId,
     UUID parentId,
-    UUID milestoneId,
     Instant createdAt,
     Instant updatedAt
 ) {
@@ -35,7 +34,6 @@ public record WorkItemResponse(
             item.getCreatorId(),
             item.getAssigneeId(),
             item.getParentId(),
-            item.getMilestoneId(),
             item.getCreatedAt(),
             item.getUpdatedAt()
         );

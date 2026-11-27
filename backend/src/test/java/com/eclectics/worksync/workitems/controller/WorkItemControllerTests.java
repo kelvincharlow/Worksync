@@ -1,5 +1,6 @@
 package com.eclectics.worksync.workitems.controller;
 
+import com.eclectics.worksync.auth.security.WorkSyncPrincipal;
 import com.eclectics.worksync.workitems.dto.CreateWorkItemRequest;
 import com.eclectics.worksync.workitems.dto.WorkItemResponse;
 import com.eclectics.worksync.workitems.entity.WorkItemPriority;
@@ -8,6 +9,7 @@ import com.eclectics.worksync.workitems.entity.WorkItemType;
 import com.eclectics.worksync.workitems.exception.WorkItemNotFoundException;
 import com.eclectics.worksync.workitems.service.WorkItemService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,6 +18,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -43,16 +49,29 @@ class WorkItemControllerTests {
     @InjectMocks
     private WorkItemController workItemController;
 
+    private final UUID actorId = UUID.randomUUID();
+    private Authentication auth;
+
     @BeforeEach
     void setUp() {
+        WorkSyncPrincipal principal = new WorkSyncPrincipal(actorId, "user@example.com");
+        auth = new UsernamePasswordAuthenticationToken(principal, null);
+        SecurityContextHolder.getContext().setAuthentication(auth);
+
         mockMvc = MockMvcBuilders
                 .standaloneSetup(workItemController)
+                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .setControllerAdvice(new WorkItemExceptionHandler())
                 .build();
     }
 
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
+    }
+
     @Test
-    @DisplayName("POST returns 201 Created when request is valid")
+    @DisplayName("POST returns 201 Created when authenticated and request is valid")
     void createWorkItem_validRequest_returns201() throws Exception {
         UUID projectId = UUID.randomUUID();
         UUID workItemId = UUID.randomUUID();
@@ -69,11 +88,11 @@ class WorkItemControllerTests {
                 workItemId, projectId, WorkItemType.STORY,
                 "Valid Title", "Description",
                 WorkItemStatus.TODO, WorkItemPriority.HIGH,
-                UUID.randomUUID(), null, null, null,
+                actorId, null, null,
                 Instant.now(), Instant.now()
         );
 
-        when(workItemService.createWorkItem(eq(projectId), any(), any()))
+        when(workItemService.createWorkItem(eq(projectId), eq(actorId), any()))
                 .thenReturn(mockResponse);
 
         mockMvc.perform(post("/api/v1/projects/{projectId}/work-items", projectId)
@@ -83,6 +102,23 @@ class WorkItemControllerTests {
                 .andExpect(jsonPath("$.id").value(workItemId.toString()))
                 .andExpect(jsonPath("$.title").value("Valid Title"))
                 .andExpect(jsonPath("$.status").value("TODO"));
+    }
+
+    @Test
+    @DisplayName("POST returns 401 Unauthorized when caller is unauthenticated")
+    void createWorkItem_unauthenticated_returns401() throws Exception {
+        // Clear security context to simulate an unauthenticated request
+        SecurityContextHolder.clearContext();
+
+        UUID projectId = UUID.randomUUID();
+        CreateWorkItemRequest request = new CreateWorkItemRequest(
+                WorkItemType.TASK, "Some Task", null, null, null, null, null
+        );
+
+        mockMvc.perform(post("/api/v1/projects/{projectId}/work-items", projectId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -115,7 +151,7 @@ class WorkItemControllerTests {
                 workItemId, projectId, WorkItemType.TASK,
                 "Task 1", "Desc",
                 WorkItemStatus.TODO, WorkItemPriority.MEDIUM,
-                UUID.randomUUID(), null, null, null,
+                actorId, null, null,
                 Instant.now(), Instant.now()
         );
 
