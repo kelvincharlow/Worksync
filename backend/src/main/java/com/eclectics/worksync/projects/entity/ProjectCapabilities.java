@@ -14,7 +14,7 @@ public final class ProjectCapabilities {
             case VIEW_PROJECT -> true;
             case VIEW_PROJECT_TEAM -> role!=ProjectRole.VIEWER;
             case UPDATE_PROJECT_DETAILS,SELECT_ELIGIBLE_USERS,ADD_PROJECT_MEMBER -> role==ProjectRole.MANAGER;
-            case ADD_PROJECT_MANAGER -> role==ProjectRole.MANAGER && isOwner;
+            case ADD_PROJECT_MANAGER,TRANSFER_PROJECT_OWNERSHIP -> role==ProjectRole.MANAGER && isOwner;
             default -> false; // Planned Work Items/delivery operations are never advertised here.
         };
     }

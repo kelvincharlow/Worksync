@@ -11,7 +11,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.method.annotation.*;
 
-@RestControllerAdvice(assignableTypes={ProjectTeamController.class,ProjectDetailsController.class,ProjectPermissionController.class})
+@RestControllerAdvice(assignableTypes={ProjectTeamController.class,ProjectDetailsController.class,ProjectPermissionController.class,ProjectOwnershipController.class})
 public class ProjectTeamExceptionHandler {
     @ExceptionHandler(ProjectNotFoundException.class)
     public ResponseEntity<ProjectErrorResponse> missing() { return error(HttpStatus.NOT_FOUND,"PROJECT_NOT_FOUND","Project not found"); }
@@ -19,6 +19,8 @@ public class ProjectTeamExceptionHandler {
     public ResponseEntity<ProjectErrorResponse> denied() { return error(HttpStatus.FORBIDDEN,"PROJECT_ACCESS_DENIED","Project access denied"); }
     @ExceptionHandler(ProjectArchivedException.class)
     public ResponseEntity<ProjectErrorResponse> archived() { return error(HttpStatus.CONFLICT,"PROJECT_ARCHIVED","Project is archived"); }
+    @ExceptionHandler(ProjectOwnershipConflictException.class)
+    public ResponseEntity<ProjectErrorResponse> ownershipConflict() { return error(HttpStatus.CONFLICT,"PROJECT_OWNERSHIP_CONFLICT","Ownership transfer conflicts with current eligibility"); }
     @ExceptionHandler({ProjectMembershipConflictException.class,DataIntegrityViolationException.class})
     public ResponseEntity<ProjectErrorResponse> conflict() { return error(HttpStatus.CONFLICT,"PROJECT_MEMBERSHIP_CONFLICT","Membership conflicts with current eligibility"); }
     @ExceptionHandler({MethodArgumentNotValidException.class,HttpMessageNotReadableException.class,
