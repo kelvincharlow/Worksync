@@ -1,4 +1,4 @@
-package com.eclectics.worksync.workitems.service;
+package com.eclectics.worksync.workitems;
 
 import com.eclectics.worksync.workitems.dto.ClientWorkProgressSummary;
 import com.eclectics.worksync.workitems.dto.WorkItemSummaryResponse;
@@ -7,6 +7,8 @@ import com.eclectics.worksync.workitems.entity.WorkItemPriority;
 import com.eclectics.worksync.workitems.entity.WorkItemStatus;
 import com.eclectics.worksync.workitems.entity.WorkItemType;
 import com.eclectics.worksync.workitems.repository.WorkItemRepository;
+import com.eclectics.worksync.workitems.service.WorkItemSummaryServiceImpl;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,19 +37,21 @@ class WorkItemSummaryServiceTests {
         UUID projectId = UUID.randomUUID();
         UUID creatorId = UUID.randomUUID();
 
+        // Story in DONE status
         WorkItem item1 = new WorkItem(
                 UUID.randomUUID(), projectId, WorkItemType.STORY,
                 "Story 1", "Desc", WorkItemPriority.HIGH,
-                creatorId, null, null, null
+                creatorId, null, null
         );
         item1.changeStatus(WorkItemStatus.DONE);
 
+        // Bug in ASSIGNED status (maps to in-progress delivery bucket)
         WorkItem item2 = new WorkItem(
                 UUID.randomUUID(), projectId, WorkItemType.BUG,
                 "Bug 1", "Desc", WorkItemPriority.MEDIUM,
-                creatorId, null, null, null
+                creatorId, null, null
         );
-        item2.changeStatus(WorkItemStatus.IN_PROGRESS);
+        item2.changeStatus(WorkItemStatus.ASSIGNED);
 
         when(workItemRepository.findAllByProjectId(projectId))
                 .thenReturn(List.of(item1, item2));
@@ -64,38 +68,60 @@ class WorkItemSummaryServiceTests {
     }
 
     @Test
-    @DisplayName("Computes client-safe deliverable progress percentage correctly")
-    void getClientSafeSummary_computesProgressPercentage() {
+    @DisplayName("Computes client progress excluding bugs and subtasks to prevent double-counting")
+    void getClientSafeSummary_excludesBugsAndSubtasks() {
         UUID projectId = UUID.randomUUID();
         UUID creatorId = UUID.randomUUID();
+        UUID parentStoryId = UUID.randomUUID();
 
-        WorkItem doneItem = new WorkItem(
-                UUID.randomUUID(), projectId, WorkItemType.TASK,
-                "Task 1", "Desc", WorkItemPriority.LOW,
-                creatorId, null, null, null
+        // 1. Deliverable Story (DONE) -> counts
+        WorkItem story = new WorkItem(
+                parentStoryId, projectId, WorkItemType.STORY,
+                "Payment Gateway", null, null,
+                creatorId, null, null
         );
-        doneItem.changeStatus(WorkItemStatus.DONE);
+        story.changeStatus(WorkItemStatus.DONE);
 
-        WorkItem inProgressItem = new WorkItem(
+        // 2. Standalone Task (IN_PROGRESS) -> counts
+        WorkItem standaloneTask = new WorkItem(
                 UUID.randomUUID(), projectId, WorkItemType.TASK,
-                "Task 2", "Desc", WorkItemPriority.LOW,
-                creatorId, null, null, null
+                "Setup CDN", null, null,
+                creatorId, null, null
         );
-        inProgressItem.changeStatus(WorkItemStatus.IN_PROGRESS);
+        standaloneTask.changeStatus(WorkItemStatus.IN_PROGRESS);
+
+        // 3. Child Subtask under story (DONE) -> excluded from deliverable totals
+        WorkItem subtask = new WorkItem(
+                UUID.randomUUID(), projectId, WorkItemType.TASK,
+                "Integrate Stripe SDK", null, null,
+                creatorId, null, parentStoryId
+        );
+        subtask.changeStatus(WorkItemStatus.DONE);
+
+        // 4. Internal Bug (REPORTED) -> excluded from client progress
+        WorkItem bug = new WorkItem(
+                UUID.randomUUID(), projectId, WorkItemType.BUG,
+                "Button alignment issue", null, null,
+                creatorId, null, null
+        );
 
         when(workItemRepository.findAllByProjectId(projectId))
-                .thenReturn(List.of(doneItem, inProgressItem));
+                .thenReturn(List.of(story, standaloneTask, subtask, bug));
 
         ClientWorkProgressSummary clientSummary = summaryService.getClientSafeSummary(projectId);
 
+        // Only the story and the standalone task count as deliverables (2 total)
         assertThat(clientSummary.totalDeliverables()).isEqualTo(2);
+        // Only the story is completed (1 completed)
         assertThat(clientSummary.completedDeliverables()).isEqualTo(1);
+        // Standalone task is in progress (1 in-progress)
         assertThat(clientSummary.inProgressDeliverables()).isEqualTo(1);
+        // 1 out of 2 = 50.0%
         assertThat(clientSummary.progressPercentage()).isEqualTo(50.0);
     }
 
     @Test
-    @DisplayName("Returns zero percentage when project has no work items without division by zero")
+    @DisplayName("Returns 0.0 percentage when project has no work items without division by zero")
     void getClientSafeSummary_handlesEmptyProject() {
         UUID projectId = UUID.randomUUID();
         when(workItemRepository.findAllByProjectId(projectId)).thenReturn(List.of());
