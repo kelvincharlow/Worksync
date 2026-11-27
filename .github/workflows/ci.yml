@@ -24,6 +24,7 @@ jobs:
       TEST_DB_URL: jdbc:postgresql://localhost:5432/worksync_test
       TEST_DB_USER: worksync_test
       TEST_DB_PASSWORD: ci-disposable-only
+      JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -32,6 +33,20 @@ jobs:
           java-version: '21'
           cache: maven
           cache-dependency-path: backend/pom.xml
+      - name: Initialize Maven Wrapper (retry transient downloads)
+        timeout-minutes: 5
+        working-directory: backend
+        run: |
+          for attempt in 1 2 3; do
+            if MVNW_VERBOSE=true ./mvnw --version; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::Maven Wrapper initialization failed after 3 attempts."
+              exit 1
+            fi
+            sleep "$((attempt * 5))"
+          done
       - run: ./mvnw --batch-mode verify
         working-directory: backend
       - run: docker compose --env-file .env.example config --quiet
