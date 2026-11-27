@@ -33,6 +33,20 @@ jobs:
           java-version: '21'
           cache: maven
           cache-dependency-path: backend/pom.xml
+      - name: Initialize Maven Wrapper (retry transient downloads)
+        timeout-minutes: 5
+        working-directory: backend
+        run: |
+          for attempt in 1 2 3; do
+            if MVNW_VERBOSE=true ./mvnw --version; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::Maven Wrapper initialization failed after 3 attempts."
+              exit 1
+            fi
+            sleep "$((attempt * 5))"
+          done
       - run: ./mvnw --batch-mode verify
         working-directory: backend
       - run: docker compose --env-file .env.example config --quiet
