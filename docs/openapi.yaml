@@ -13,8 +13,8 @@ info:
     Auth-owned operation definitions below remain draft contracts; see
     docs/api-contract.md for the existing password-reset path mismatch.
 
-    Modules 2/3 (V13 agreement): POST /projects is implemented on feature/projects-create-api,
-    not yet main; other Projects,
+    Modules 2/3 (V13 agreement): POST /projects is merged into main. Eligible-user lookup and membership GET/POST
+    are implemented on feature/projects-team-management, not yet main; other Projects,
     Work Items and Bugs HTTP operations remain planned. See docs/api-contract.md for authority rules and
     explicitly unresolved/proposed choices; x-contract-decision marks proposals.
     Existing Module 1 operations and behavior are unchanged.
@@ -25,8 +25,8 @@ info:
     - Public self-registration with first name, last name, email, phone number,
       and password. Accounts begin as PENDING_APPROVAL with system role USER.
     - Administrator approval/rejection/block/unblock endpoints are implemented.
-      Users V7 PROJECT_CREATE grants and V5/V6 foundations are merged; POST /projects is implemented
-      on feature/projects-create-api, not yet main. Other Projects endpoints remain planned.
+      Users V7 PROJECT_CREATE grants, V5/V6 foundations and POST /projects are merged.
+      Eligible-user lookup and membership GET/POST are implemented on feature/projects-team-management. Other Projects endpoints remain planned.
     - Updated main SecurityConfig allows PENDING_APPROVAL users to GET and PUT
       /users/me. /api/v1/notifications/** requires STATUS_ACTIVE; pending users
       cannot access notifications. Administrator routes require ROLE_ADMIN and
@@ -844,19 +844,63 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/UpdateProjectRequest'
+  /projects/{projectId}/eligible-users:
+    get:
+      tags: [Projects]
+      operationId: listEligibleProjectUsers
+      summary: Find ACTIVE users eligible for project membership
+      x-implementation-status: implemented
+      description: >-
+        Implemented on feature/projects-team-management, not yet main. Current ACTIVE Owner/MANAGER only.
+        Unknown or non-disclosable projects return 404; MEMBER/VIEWER return 403. Archived projects return 409.
+        Users supplies minimal id/firstName/lastName/email data through a trusted Java service after Projects authorization.
+        No general directory endpoint exists. A deliberately approved Users-owned SQL read uses NOT EXISTS against
+        V5 project_members(project_id,user_id) to exclude current members before pagination and counting.
+        Search is trimmed, case-insensitive literal substring matching on full name or email, maximum 100 characters.
+        Omitted/blank search returns all eligible users. PostgreSQL filters ACTIVE accounts, applies identical
+        content/count predicates and orders by lower(last_name),lower(first_name),id ASC. No account controls or phone data.
+        Page times size must not exceed 2147483647; the exact maximum offset is accepted and larger offsets return safe 400.
+      security:
+      - BearerAuth: []
+      x-authorization: Current ACTIVE Project Owner or MANAGER; no system ADMIN or PROJECT_CREATE bypass.
+      parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/M2M3Page'
+      - $ref: '#/components/parameters/M2M3Size'
+      - name: search
+        in: query
+        required: false
+        schema: {type: string, maxLength: 100}
+      responses:
+        '200':
+          description: Eligible ACTIVE users, excluding all current memberships.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EligibleUserPageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/M2M3Conflict'
   /projects/{projectId}/members:
     get:
       tags:
       - Projects
       operationId: listProjectMembers
       summary: List internal team
-      x-implementation-status: planned
-      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+      x-implementation-status: implemented
+      description: 'Implemented on feature/projects-team-management, not yet main. Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
         per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
         non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
         returns 403. Authorization: Owner/MANAGER or MEMBER (TECHNICAL_LEAD, DEVELOPER, QA_TESTER); never VIEWER.
-        Manager/Member team visibility chosen as review proposal from agreement wording "as agreed". No Viewer directory.
-        Fixed createdAt DESC, userId DESC. Proposal requiring review: Confirm MEMBER team-directory scope.'
+        Agreed policy: ACTIVE Owner/MANAGER/MEMBER may view the team; VIEWER cannot.
+        Fixed createdAt DESC, userId DESC. Page times size must not exceed 2147483647; larger offsets return safe 400.'
       security:
       - BearerAuth: []
       x-authorization: Owner/MANAGER or MEMBER (TECHNICAL_LEAD, DEVELOPER, QA_TESTER); never VIEWER.
@@ -881,14 +925,13 @@ paths:
       - $ref: '#/components/parameters/ProjectId'
       - $ref: '#/components/parameters/M2M3Page'
       - $ref: '#/components/parameters/M2M3Size'
-      x-contract-decision: proposed-pending-review
     post:
       tags:
       - Projects
       operationId: addProjectMember
       summary: Add ACTIVE project participant
-      x-implementation-status: planned
-      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+      x-implementation-status: implemented
+      description: 'Implemented on feature/projects-team-management, not yet main. Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
         per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
         non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
         returns 403. Authorization: Owner or additional MANAGER; not ordinary MEMBER/VIEWER. Only Owner may add a
@@ -3203,6 +3246,9 @@ components:
           - QA_TESTER
           - null
           nullable: true
+        isOwner:
+          type: boolean
+          description: True only for the designated Project Owner; does not grant additional authority.
         createdAt:
           type: string
           format: date-time
@@ -3212,6 +3258,7 @@ components:
       required:
       - userId
       - displayName
+      - isOwner
       - role
       - responsibility
       - createdAt
@@ -4343,6 +4390,28 @@ components:
       - size
       - totalElements
       description: Zero-based page; size 1–100, default 20. Stable sorting with UUID tie-breaker.
+    UserSelection:
+      type: object
+      additionalProperties: false
+      required: [id, firstName, lastName, email]
+      properties:
+        id: {type: string, format: uuid}
+        firstName: {type: string}
+        lastName: {type: string}
+        email: {type: string, format: email}
+      description: Minimal ACTIVE user selection, exposed only after project manager authorization.
+    EligibleUserPageResponse:
+      type: object
+      additionalProperties: false
+      required: [content, page, size, totalElements]
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserSelection'
+        page: {type: integer, minimum: 0}
+        size: {type: integer, minimum: 1, maximum: 100}
+        totalElements: {type: integer, format: int64, minimum: 0}
     ProjectMemberPageResponse:
       type: object
       additionalProperties: false
