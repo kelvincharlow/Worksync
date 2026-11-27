@@ -45,6 +45,7 @@ class UserServiceTests {
     private static final String HASH_FIXTURE = "encoded-hash-fixture";
     private static ValidatorFactory validatorFactory;
     @Mock UserRepository repository;
+    @Mock com.eclectics.worksync.users.repository.UserPermissionRepository permissions;
     @Mock jakarta.persistence.EntityManager entityManager;
     private UserService service;
 
@@ -60,7 +61,7 @@ class UserServiceTests {
 
     @BeforeEach
     void setUp() {
-        service = new UserService(repository, validatorFactory.getValidator(), entityManager);
+        service = new UserService(repository, validatorFactory.getValidator(), entityManager, permissions);
     }
 
     @Test
