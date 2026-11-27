@@ -138,7 +138,7 @@ not instructions to implement modules or release them in this change.
 OpenAPI version **0.3.0**, specification **3.0.3**, adds Projects (M2, Kelvin) and
 Work Items/Bugs (M3, Phoebe). Project creation, eligible-user lookup and membership GET/POST
 are merged into main. Project GET list/details and PATCH details are merged through PR #19. Effective permissions
-is implemented on `feature/projects-effective-permissions`; other M2/M3 HTTP operations remain planned. Existing Module 1 paths, operations, schemas,
+is merged through PR #20; ownership transfer is implemented on `feature/projects-membership-lifecycle`; other M2/M3 HTTP operations remain planned. Existing Module 1 paths, operations, schemas,
 error definitions and public Auth security overrides are preserved. The earlier
 Module 1 sections above describe that baseline. This creation slice does not implement
 other M2/M3 endpoints, feature configuration, frontend screens or deployment changes.
@@ -461,7 +461,7 @@ missing effective permission (pending accounts receive 403; Auth rejects blocked
 
 Initial creation response defaults are temporary and explicitly approved for this slice:
 `permissions.role=MANAGER`, `responsibility=null`, `isOwner=true`; actions now reflect the
-six implemented Owner capabilities (see effective permissions below).
+seven implemented Owner capabilities (see effective permissions below).
 `configuration.enabledViews=[]`, `configuration.enabledWorkTypes=[]`. Overview and Planning
 remain mandatory. No configurable-feature persistence, additional permission grants or
 Work Item functionality is enabled. Only currently implemented project API capabilities
@@ -479,7 +479,7 @@ schema-validation infrastructure is introduced in this slice.
 
 POST `/projects` is merged through PR #17. The following additions are implemented
 in main through PR #18; membership PATCH/DELETE, ownership
-transfer, project archiving and frontend work remain planned; project details updates are merged through PR #19:
+project archiving and frontend work remain planned; ownership transfer is implemented in the slice below, and project details updates are merged through PR #19:
 
 | Endpoint | Authorization and behavior |
 | --- | --- |
@@ -568,15 +568,14 @@ READ_COMMITTED transaction reuses Users' existing ACTIVE-actor lifecycle guard
 before the Project row lock, then refreshes and rechecks authority/status. No new
 Users interface, permission grant, migration or ownership/membership change is needed.
 The complete transaction rolls back on failure; updatedAt changes on persisted edits.
-Owner transfer, archive, member PATCH/DELETE, feature settings and frontend work
-remain outside this slice. No new unresolved contract decisions are introduced;
+Ownership transfer is implemented in the separate slice below. Archive, member
+PATCH/DELETE, feature settings and frontend work remain outside this slice. No new unresolved contract decisions are introduced;
 previous configurable-feature policy and generic response-schema validation remain
 follow-ups.
 
-## Effective project permissions — feature/projects-effective-permissions
+## Effective project permissions — merged through PR #20
 
-GET `/api/v1/projects/{projectId}/permissions/me` is implemented on this branch,
-not yet main. Identity comes only from WorkSyncPrincipal. The read-only service
+GET `/api/v1/projects/{projectId}/permissions/me` is merged through PR #20. Identity comes only from WorkSyncPrincipal. The read-only service
 reuses ProjectAccessService.getMemberAccess, which checks current ACTIVE account,
 current membership/responsibility, Owner designation and project lifecycle from the
 database. Missing or non-disclosable projects return safe 404; neither ADMIN nor a
@@ -586,7 +585,7 @@ The approved action-vocabulary update describes implemented Projects APIs only:
 
 | Participant | ACTIVE project actions |
 | --- | --- |
-| Owner | VIEW_PROJECT, VIEW_PROJECT_TEAM, UPDATE_PROJECT_DETAILS, SELECT_ELIGIBLE_USERS, ADD_PROJECT_MEMBER, ADD_PROJECT_MANAGER |
+| Owner | VIEW_PROJECT, VIEW_PROJECT_TEAM, UPDATE_PROJECT_DETAILS, SELECT_ELIGIBLE_USERS, ADD_PROJECT_MEMBER, ADD_PROJECT_MANAGER, TRANSFER_PROJECT_OWNERSHIP |
 | Additional MANAGER | VIEW_PROJECT, VIEW_PROJECT_TEAM, UPDATE_PROJECT_DETAILS, SELECT_ELIGIBLE_USERS, ADD_PROJECT_MEMBER |
 | MEMBER / TECHNICAL_LEAD | VIEW_PROJECT, VIEW_PROJECT_TEAM |
 | MEMBER / DEVELOPER | VIEW_PROJECT, VIEW_PROJECT_TEAM |
@@ -596,8 +595,8 @@ The approved action-vocabulary update describes implemented Projects APIs only:
 Archived projects retain only viewing actions: VIEW_PROJECT for everyone and
 VIEW_PROJECT_TEAM for Owner/MANAGER/MEMBER. ADD_PROJECT_MEMBER means adding MEMBER
 or VIEWER, with existing responsibility rules; only Owner may ADD_PROJECT_MANAGER.
-No demotion, transfer, member removal, archive or feature-configuration capability
-is advertised while those endpoints remain planned. Work Items and delivery enum
+Ownership transfer is now advertised only to the ACTIVE Owner of a non-archived project.
+Demotion, member removal, archive and feature-configuration capabilities remain unadvertised. Work Items and delivery enum
 values remain in the draft/shared authorization vocabulary, but are excluded from
 these UI hints until backend functionality and enabled-feature policy support them.
 Existing Work Items authorization behavior is not changed by this endpoint.
@@ -617,3 +616,36 @@ writes retain the existing V7 lifecycle-lock and Projects transaction boundaries
 No new migration, security configuration, Users/Auth/Notifications/Work Items or
 frontend implementation is included. Optional-feature configuration, Work Items/
 delivery APIs and all other planned Projects mutations remain separate work.
+
+## Ownership transfer — feature/projects-membership-lifecycle
+
+POST `/api/v1/projects/{projectId}/ownership-transfer` is implemented on this branch,
+not yet main. Only the current ACTIVE designated Owner may call it. The body has
+one required UUID `newOwnerUserId`; unknown/malformed/null values return safe 400.
+The target must be different, ACTIVE and an existing MANAGER in this same project.
+Self/inactive/non-Manager/non-member/missing targets return safe 409
+PROJECT_OWNERSHIP_CONFLICT without exposing account details. Archived transfers
+return 409 PROJECT_ARCHIVED; non-Owner participants 403, hidden/missing projects 404.
+ADMIN and PROJECT_CREATE alone never grant transfer authority.
+
+A writable READ_COMMITTED transaction acquires the unchanged Users lifecycle lock
+before the Project row lock, refreshes the Project, rechecks current Owner and
+membership, locks actor/target membership rows in UUID order and refreshes them,
+then checks current ACTIVE target state. Only owner_user_id is changed; creator,
+status, brief and both MANAGER memberships are preserved. V5's deferred composite
+Owner/MANAGER FK remains authoritative at commit. Failure rolls back the complete
+transaction. Concurrent transfers from the same previous Owner serialize; after
+one succeeds, the other loses Owner authorization. Account blocking that wins the
+lifecycle lock prevents an ineligible target from becoming Owner.
+
+The 200 ProjectResponse belongs to the acting previous Owner: ownerUserId identifies
+the new Owner, while permissions.isOwner is false and Owner-only actions disappear.
+The new Owner's next permissions lookup includes ADD_PROJECT_MANAGER and
+TRANSFER_PROJECT_OWNERSHIP. Archived projects expose neither action. Transfer hints
+represent role/lifecycle authority, not a promise that an eligible target exists;
+the mutation always validates the selected target again.
+
+Membership PATCH/DELETE and eligibility-reducing changes remain deferred pending
+agreement with Work Items on membership-impact assessment and a shared writer lock/
+recheck protocol. No cross-module reference query, Work Items change, migration,
+member role update/removal or new public user-directory endpoint is introduced.

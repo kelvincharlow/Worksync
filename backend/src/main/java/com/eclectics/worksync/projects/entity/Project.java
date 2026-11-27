@@ -50,6 +50,13 @@ public class Project {
         if (!isDateRangeValid()) throw new IllegalArgumentException("Invalid project date range");
     }
 
+    /** Called only by the locked transfer service after checking current Owner and target MANAGER eligibility. */
+    public void transferOwnership(UUID newOwnerUserId) {
+        Objects.requireNonNull(newOwnerUserId,"New Owner is required");
+        if(newOwnerUserId.equals(ownerUserId)) throw new IllegalArgumentException("Different Owner required");
+        ownerUserId=newOwnerUserId;
+    }
+
     /** Controlled brief update only; validate the complete resulting dates before changing any field. */
     public void updateDetails(String name,String description,String requirements,String scope,String deliverables,
             String successCriteria,LocalDate startDate,LocalDate dueDate) {

@@ -76,7 +76,7 @@ class ProjectPermissionIntegrationTests {
         if(role!=ProjectRole.VIEWER)expected.add("VIEW_PROJECT_TEAM");
         if(status==ProjectStatus.ACTIVE && role==ProjectRole.MANAGER) {
             expected.addAll(Set.of("UPDATE_PROJECT_DETAILS","SELECT_ELIGIBLE_USERS","ADD_PROJECT_MEMBER"));
-            if(isOwner)expected.add("ADD_PROJECT_MANAGER");
+            if(isOwner)expected.addAll(Set.of("ADD_PROJECT_MANAGER","TRANSFER_PROJECT_OWNERSHIP"));
         }
         assertThat((List<String>)result.get("actions")).containsExactlyInAnyOrderElementsOf(expected).doesNotHaveDuplicates();
         if(role==ProjectRole.VIEWER) {

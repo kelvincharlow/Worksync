@@ -99,7 +99,7 @@ class ProjectAccessServiceTests {
         if (action == ProjectAction.VIEW_DELIVERY || action == ProjectAction.VIEW_INTERNAL_WORK
                 || action == ProjectAction.VIEW_PROJECT || action == ProjectAction.VIEW_PROJECT_TEAM)
             assertThatCode(() -> service.requireAction(projectId, actor, action)).doesNotThrowAnyException();
-        else if(action==ProjectAction.ADD_PROJECT_MANAGER)
+        else if(action==ProjectAction.ADD_PROJECT_MANAGER || action==ProjectAction.TRANSFER_PROJECT_OWNERSHIP)
             assertThatThrownBy(() -> service.requireAction(projectId, actor, action)).isInstanceOf(ProjectAccessDeniedException.class);
         else assertThatThrownBy(() -> service.requireAction(projectId, actor, action)).isInstanceOf(ProjectArchivedException.class);
     }
@@ -108,6 +108,12 @@ class ProjectAccessServiceTests {
         assertThatThrownBy(() -> service.requireAction(projectId,actor,ProjectAction.ADD_PROJECT_MANAGER)).isInstanceOf(ProjectAccessDeniedException.class);
         ReflectionTestUtils.setField(project,"ownerUserId",actor);
         assertThatCode(() -> service.requireAction(projectId,actor,ProjectAction.ADD_PROJECT_MANAGER)).doesNotThrowAnyException();
+    }
+    @Test void onlyOwnerMayTransferOwnership() {
+        setupMember(ProjectRole.MANAGER,null);
+        assertThatThrownBy(() -> service.requireAction(projectId,actor,ProjectAction.TRANSFER_PROJECT_OWNERSHIP)).isInstanceOf(ProjectAccessDeniedException.class);
+        ReflectionTestUtils.setField(project,"ownerUserId",actor);
+        assertThatCode(() -> service.requireAction(projectId,actor,ProjectAction.TRANSFER_PROJECT_OWNERSHIP)).doesNotThrowAnyException();
     }
     @Test void writableGuardRejectsArchivedProject() {
         when(projects.findById(projectId)).thenReturn(Optional.of(project));
