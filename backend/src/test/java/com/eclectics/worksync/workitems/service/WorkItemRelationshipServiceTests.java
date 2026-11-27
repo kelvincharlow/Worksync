@@ -50,12 +50,10 @@ class WorkItemRelationshipServiceTests {
         when(workItemRepository.findByIdAndProjectId(storyId, projectId))
                 .thenReturn(Optional.of(story));
 
-        // Story under Epic
         assertThatCode(() -> relationshipService.validateParentRelationship(
                 projectId, null, WorkItemType.STORY, epicId
         )).doesNotThrowAnyException();
 
-        // Task under Story
         assertThatCode(() -> relationshipService.validateParentRelationship(
                 projectId, null, WorkItemType.TASK, storyId
         )).doesNotThrowAnyException();
@@ -111,7 +109,7 @@ class WorkItemRelationshipServiceTests {
     }
 
     @Test
-    @DisplayName("Subtask nesting beyond one level deep is rejected")
+    @DisplayName("Subtask nesting beyond one level deep is rejected (parent is already subtask)")
     void subtaskNestingBeyondLimitFails() {
         UUID grandParentTaskId = UUID.randomUUID();
         UUID parentSubtaskId = UUID.randomUUID();
@@ -130,11 +128,35 @@ class WorkItemRelationshipServiceTests {
         when(workItemRepository.findByIdAndProjectId(grandParentTaskId, projectId))
                 .thenReturn(Optional.of(grandParentTask));
 
-        // Attempting to add a subtask under another subtask must fail
         assertThatThrownBy(() -> relationshipService.validateParentRelationship(
                 projectId, null, WorkItemType.TASK, parentSubtaskId
         )).isInstanceOf(InvalidWorkItemRelationshipException.class)
           .hasMessageContaining("Subtasks cannot be nested more than one level deep");
+    }
+
+    @Test
+    @DisplayName("Reparenting task fails if it already has child subtasks of its own")
+    void reparentingTaskWithExistingSubtasksFails() {
+        UUID taskAId = UUID.randomUUID();
+        UUID newParentTaskId = UUID.randomUUID();
+
+        WorkItem newParentTask = new WorkItem(
+                newParentTaskId, projectId, WorkItemType.TASK, "New Parent Task",
+                null, null, creatorId, null, null
+        );
+
+        when(workItemRepository.findByIdAndProjectId(newParentTaskId, projectId))
+                .thenReturn(Optional.of(newParentTask));
+
+        // Task A already has child subtasks in the database
+        when(workItemRepository.existsByProjectIdAndParentId(projectId, taskAId))
+                .thenReturn(true);
+
+        // Reparenting Task A under New Parent Task must be rejected to prevent 2-level nesting
+        assertThatThrownBy(() -> relationshipService.validateParentRelationship(
+                projectId, taskAId, WorkItemType.TASK, newParentTaskId
+        )).isInstanceOf(InvalidWorkItemRelationshipException.class)
+          .hasMessageContaining("Cannot make task a subtask because it already has child subtasks");
     }
 
     @Test
@@ -154,7 +176,6 @@ class WorkItemRelationshipServiceTests {
         UUID taskAId = UUID.randomUUID();
         UUID taskBId = UUID.randomUUID();
 
-        // Task B already has Task A as parent
         WorkItem taskB = new WorkItem(
                 taskBId, projectId, WorkItemType.TASK, "Task B", null, null, creatorId, null, taskAId
         );
@@ -162,7 +183,6 @@ class WorkItemRelationshipServiceTests {
         when(workItemRepository.findByIdAndProjectId(taskBId, projectId))
                 .thenReturn(Optional.of(taskB));
 
-        // Updating Task A to make Task B its parent creates an indirect cycle
         assertThatThrownBy(() -> relationshipService.validateParentRelationship(
                 projectId, taskAId, WorkItemType.TASK, taskBId
         )).isInstanceOf(InvalidWorkItemRelationshipException.class)

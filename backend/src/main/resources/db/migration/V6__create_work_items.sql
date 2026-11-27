@@ -31,14 +31,14 @@ CREATE TABLE work_items (
     CONSTRAINT ux_work_items_id_type UNIQUE (id, type)
 );
 
--- Work item relationship graph
+-- Work item relationship graph (restricted to contract-approved general types)
 CREATE TABLE work_item_links (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id UUID NOT NULL REFERENCES projects(id) ON DELETE RESTRICT,
     source_id UUID NOT NULL,
     target_id UUID NOT NULL,
     link_type VARCHAR(32) NOT NULL CHECK (
-        link_type IN ('BLOCKS', 'BLOCKED_BY', 'RELATES_TO', 'DUPLICATE_OF')
+        link_type IN ('BLOCKS', 'RELATES_TO')
     ),
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
 

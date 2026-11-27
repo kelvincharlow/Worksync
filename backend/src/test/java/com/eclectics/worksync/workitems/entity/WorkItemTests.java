@@ -92,7 +92,7 @@ class WorkItemTests {
     }
 
     @Test
-    @DisplayName("Enforces valid status transitions for tasks and rejects bug statuses")
+    @DisplayName("Enforces valid sequential status transitions for tasks")
     void enforcesStatusTransitionsForTasks() {
         WorkItem task = new WorkItem(
                 null, UUID.randomUUID(), WorkItemType.TASK,
@@ -101,31 +101,52 @@ class WorkItemTests {
         );
 
         task.changeStatus(WorkItemStatus.IN_PROGRESS);
-        assertThat(task.getStatus()).isEqualTo(WorkItemStatus.IN_PROGRESS);
+        task.changeStatus(WorkItemStatus.IN_REVIEW);
+        task.changeStatus(WorkItemStatus.DONE);
+        assertThat(task.getStatus()).isEqualTo(WorkItemStatus.DONE);
 
         // Setting a task to a bug-only status must throw
         assertThatThrownBy(() -> task.changeStatus(WorkItemStatus.TRIAGE))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Status TRIAGE is not valid for work item type TASK");
+                .hasMessageContaining("Status TRIAGE is not valid for TASK");
     }
 
     @Test
-    @DisplayName("Enforces valid status transitions for bugs and rejects generic-only statuses")
-    void enforcesStatusTransitionsForBugs() {
+    @DisplayName("Enforces full sequential lifecycle for bugs")
+    void enforcesSequentialBugLifecycle() {
         WorkItem bug = new WorkItem(
                 null, UUID.randomUUID(), WorkItemType.BUG,
                 "Broken login", null, null,
                 UUID.randomUUID(), null, null
         );
 
+        // REPORTED -> TRIAGE -> ASSIGNED -> IN_PROGRESS -> READY_FOR_VERIFICATION -> CLOSED
         bug.changeStatus(WorkItemStatus.TRIAGE);
+        bug.changeStatus(WorkItemStatus.ASSIGNED);
+        bug.changeStatus(WorkItemStatus.IN_PROGRESS);
         bug.changeStatus(WorkItemStatus.READY_FOR_VERIFICATION);
         bug.changeStatus(WorkItemStatus.CLOSED);
-        assertThat(bug.getStatus()).isEqualTo(WorkItemStatus.CLOSED);
 
-        // Setting a bug to generic-only status IN_REVIEW must throw
-        assertThatThrownBy(() -> bug.changeStatus(WorkItemStatus.IN_REVIEW))
+        assertThat(bug.getStatus()).isEqualTo(WorkItemStatus.CLOSED);
+    }
+
+    @Test
+    @DisplayName("Rejects illegal status jump from TRIAGE directly to READY_FOR_VERIFICATION")
+    void rejectsIllegalBugStatusJump() {
+        WorkItem bug = new WorkItem(
+                null, UUID.randomUUID(), WorkItemType.BUG,
+                "Crash on submit", null, null,
+                UUID.randomUUID(), null, null
+        );
+
+        bug.changeStatus(WorkItemStatus.TRIAGE);
+
+        // Jumping directly to READY_FOR_VERIFICATION without fixing must fail
+        assertThatThrownBy(() -> bug.changeStatus(WorkItemStatus.READY_FOR_VERIFICATION))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Status IN_REVIEW is not valid for work item type BUG");
+                .hasMessageContaining("Cannot transition BUG from TRIAGE to READY_FOR_VERIFICATION");
+
+        // Status must remain TRIAGE (not mutated on error)
+        assertThat(bug.getStatus()).isEqualTo(WorkItemStatus.TRIAGE);
     }
 }
