@@ -41,11 +41,13 @@ class WorkItemsFoundationIntegrationTests {
     @Profile("workitems-foundation-test")
     @EnableAutoConfiguration
     @EntityScan(basePackageClasses = {
-        WorkItem.class, BugDetails.class, BugVerification.class, Project.class, User.class
+        WorkItem.class, WorkItemLink.class, BugDetails.class, 
+        BugVerification.class, Project.class, User.class
     })
     @EnableJpaRepositories(basePackageClasses = {
         WorkItemRepository.class, BugDetailsRepository.class,
-        BugVerificationRepository.class, ProjectRepository.class, ProjectMemberRepository.class
+        BugVerificationRepository.class, ProjectRepository.class, 
+        ProjectMemberRepository.class
     })
     static class TestApplication {}
 
@@ -62,7 +64,8 @@ class WorkItemsFoundationIntegrationTests {
     TransactionTemplate tx() {
         return new TransactionTemplate(manager);
     }
-@BeforeEach
+
+    @BeforeEach
     @AfterEach
     void clean() {
         tx().executeWithoutResult(t -> {
@@ -130,19 +133,17 @@ class WorkItemsFoundationIntegrationTests {
     }
 
     @Test
-    @DisplayName("Database enforces same-project parent constraint: rejects parent from another project")
+    @DisplayName("Database enforces same-project parent constraint")
     void databaseRejectsParentFromDifferentProject() {
         UUID user = createUser("lead@example.com");
         Project projectA = createProject(user, "Project A");
         Project projectB = createProject(user, "Project B");
 
-        // Parent in Project A
         WorkItem parentInA = tx().execute(t -> workItems.saveAndFlush(new WorkItem(
             null, projectA.getId(), WorkItemType.STORY,
             "Story in A", null, null, user, null, null
         )));
 
-        // Child in Project B referencing parent in Project A must be rejected by PostgreSQL
         WorkItem childInB = new WorkItem(
             null, projectB.getId(), WorkItemType.TASK,
             "Task in B", null, null, user, null, parentInA.getId()
@@ -153,12 +154,52 @@ class WorkItemsFoundationIntegrationTests {
     }
 
     @Test
+    @DisplayName("Database rejects cross-project work item link")
+    void databaseRejectsCrossProjectLink() {
+        UUID user = createUser("linker@example.com");
+        Project projectA = createProject(user, "Project A");
+        Project projectB = createProject(user, "Project B");
+
+        WorkItem itemA = tx().execute(t -> workItems.saveAndFlush(new WorkItem(
+            null, projectA.getId(), WorkItemType.TASK, "Task A", null, null, user, null, null
+        )));
+        WorkItem itemB = tx().execute(t -> workItems.saveAndFlush(new WorkItem(
+            null, projectB.getId(), WorkItemType.TASK, "Task B", null, null, user, null, null
+        )));
+
+        // Attempting to link items across different projects in work_item_links must fail
+        assertThatThrownBy(() -> jdbc.update(
+            "INSERT INTO work_item_links (id, project_id, source_id, target_id, link_type) " +
+            "VALUES (?, ?, ?, ?, 'BLOCKS')",
+            UUID.randomUUID(), projectA.getId(), itemA.getId(), itemB.getId()
+        )).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    @DisplayName("Database rejects attaching bug details to an ordinary Task or Story")
+    void databaseRejectsBugDetailsOnNonBugItem() {
+        UUID user = createUser("developer@example.com");
+        Project p = createProject(user, "Core Project");
+
+        WorkItem story = tx().execute(t -> workItems.saveAndFlush(new WorkItem(
+            null, p.getId(), WorkItemType.STORY, "User Story", null, null, user, null, null
+        )));
+
+        // Attempting to attach bug_details to an item of type STORY must fail foreign key
+        assertThatThrownBy(() -> jdbc.update(
+            "INSERT INTO bug_details (work_item_id, severity, affected_area, " +
+            "reproduction_steps, expected_result, actual_result) " +
+            "VALUES (?, 'HIGH', 'Checkout', 'Step 1', 'Success', 'Error')",
+            story.getId()
+        )).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
     @DisplayName("Database rejects blank title constraint (btrim(title) <> '')")
     void databaseRejectsBlankTitle() {
         UUID user = createUser("dev@example.com");
         Project p = createProject(user, "Test Project");
 
-        // Attempt direct SQL insert with blank title to verify PostgreSQL constraint
         assertThatThrownBy(() -> jdbc.update(
             "INSERT INTO work_items (id, project_id, type, title, status, priority, creator_id) " +
             "VALUES (?, ?, 'TASK', '    ', 'TODO', 'MEDIUM', ?)",
@@ -177,7 +218,6 @@ class WorkItemsFoundationIntegrationTests {
             "Crash on checkout", null, null, user, null, null
         )));
 
-        // Direct SQL insert attempting to set verifier_id equal to fixer_id
         assertThatThrownBy(() -> jdbc.update(
             "INSERT INTO bug_details (work_item_id, severity, affected_area, " +
             "reproduction_steps, expected_result, actual_result, fixer_id, verifier_id) " +

@@ -63,8 +63,9 @@ public class WorkItem {
         this.description = description;
         this.priority = priority != null ? priority : WorkItemPriority.MEDIUM;
 
-        // Default initial status based on type
-        this.status = (type == WorkItemType.BUG) ? WorkItemStatus.REPORTED : WorkItemStatus.TODO;
+        this.status = (type == WorkItemType.BUG) 
+                ? WorkItemStatus.REPORTED 
+                : WorkItemStatus.TODO;
 
         this.assigneeId = assigneeId;
         this.setParent(parentId);
@@ -74,7 +75,6 @@ public class WorkItem {
         this.updatedAt = now;
     }
 
-    // Invariant helpers
     private String validateAndTrimTitle(String rawTitle) {
         if (rawTitle == null || rawTitle.trim().isEmpty()) {
             throw new IllegalArgumentException("Title cannot be blank");
@@ -89,21 +89,23 @@ public class WorkItem {
     public void setParent(UUID parentId) {
         if (parentId != null) {
             if (this.id != null && parentId.equals(this.id)) {
-                throw new IllegalArgumentException("Work item cannot reference itself as parent");
+                throw new IllegalArgumentException(
+                        "Work item cannot reference itself as parent");
             }
             if (this.type == WorkItemType.EPIC) {
-                throw new IllegalArgumentException("An EPIC cannot have a parent work item");
+                throw new IllegalArgumentException(
+                        "An EPIC cannot have a parent work item");
             }
         }
         this.parentId = parentId;
         this.updatedAt = Instant.now();
     }
 
-    public void updateDetails(String newTitle, String newDescription, WorkItemPriority newPriority) {
+    public void updateDetails(String newTitle, String newDesc, WorkItemPriority newPriority) {
         if (newTitle != null) {
             this.title = validateAndTrimTitle(newTitle);
         }
-        this.description = newDescription;
+        this.description = newDesc;
         if (newPriority != null) {
             this.priority = newPriority;
         }
@@ -112,12 +114,47 @@ public class WorkItem {
 
     public void changeStatus(WorkItemStatus newStatus) {
         Objects.requireNonNull(newStatus, "Status cannot be null");
+        if (this.status == newStatus) {
+            return;
+        }
         if (!newStatus.isValidFor(this.type)) {
             throw new IllegalArgumentException(
-                    "Status " + newStatus + " is not valid for work item type " + this.type);
+                    "Status " + newStatus + " is not valid for " + this.type);
+        }
+        if (!isAllowedTransition(this.status, newStatus)) {
+            throw new IllegalArgumentException(
+                    "Cannot transition " + this.type + " from " + this.status + " to " + newStatus);
         }
         this.status = newStatus;
         this.updatedAt = Instant.now();
+    }
+
+    private boolean isAllowedTransition(WorkItemStatus from, WorkItemStatus to) {
+        if (this.type == WorkItemType.BUG) {
+            return switch (from) {
+                case REPORTED -> to == WorkItemStatus.TRIAGE;
+                case TRIAGE -> to == WorkItemStatus.ASSIGNED || to == WorkItemStatus.CLOSED;
+                case ASSIGNED -> to == WorkItemStatus.IN_PROGRESS;
+                case IN_PROGRESS -> to == WorkItemStatus.READY_FOR_VERIFICATION;
+                case READY_FOR_VERIFICATION -> to == WorkItemStatus.CLOSED || to == WorkItemStatus.REOPENED;
+                case REOPENED -> to == WorkItemStatus.TRIAGE || to == WorkItemStatus.ASSIGNED;
+                case CLOSED -> to == WorkItemStatus.REOPENED;
+                default -> false;
+            };
+        }
+
+        // Generic workflow (EPIC, STORY, TASK)
+        return switch (from) {
+            case TODO -> to == WorkItemStatus.IN_PROGRESS;
+            case IN_PROGRESS -> to == WorkItemStatus.IN_REVIEW 
+                    || to == WorkItemStatus.DONE 
+                    || to == WorkItemStatus.TODO;
+            case IN_REVIEW -> to == WorkItemStatus.DONE 
+                    || to == WorkItemStatus.IN_PROGRESS;
+            case DONE -> to == WorkItemStatus.TODO 
+                    || to == WorkItemStatus.IN_PROGRESS;
+            default -> false;
+        };
     }
 
     public void assignTo(UUID assigneeId) {

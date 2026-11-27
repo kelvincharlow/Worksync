@@ -1,7 +1,7 @@
 package com.eclectics.worksync.workitems.entity;
 
 public enum WorkItemStatus {
-    // Generic lifecycle (EPIC, STORY, TASK)
+    // Generic workflow (EPIC, STORY, TASK)
     TODO,
     IN_PROGRESS,
     IN_REVIEW,
@@ -12,21 +12,19 @@ public enum WorkItemStatus {
     TRIAGE,
     ASSIGNED,
     READY_FOR_VERIFICATION,
-    CLOSED,
     REOPENED,
-    INVALID,
-    DUPLICATE;
+    CLOSED;
 
     /**
-     * Checks if a status is allowed for a given work item type.
+     * Checks if this status is allowed for a given work item type.
      */
     public boolean isValidFor(WorkItemType type) {
         if (type == WorkItemType.BUG) {
             return this == REPORTED || this == TRIAGE || this == ASSIGNED
                     || this == IN_PROGRESS || this == READY_FOR_VERIFICATION
-                    || this == CLOSED || this == REOPENED
-                    || this == INVALID || this == DUPLICATE;
+                    || this == REOPENED || this == CLOSED;
         }
-        return this == TODO || this == IN_PROGRESS || this == IN_REVIEW || this == DONE;
+        return this == TODO || this == IN_PROGRESS 
+                || this == IN_REVIEW || this == DONE;
     }
 }
