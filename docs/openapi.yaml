@@ -13,8 +13,8 @@ info:
     Auth-owned operation definitions below remain draft contracts; see
     docs/api-contract.md for the existing password-reset path mismatch.
 
-    Modules 2/3 (V13 agreement): POST /projects is merged into main. Eligible-user lookup and membership GET/POST
-    are implemented on feature/projects-team-management, not yet main; other Projects,
+    Modules 2/3 (V13 agreement): project creation, eligible-user lookup and membership GET/POST are merged into main.
+    Project GET list/details and PATCH details are implemented on feature/projects-list-details-update, not yet main; other Projects,
     Work Items and Bugs HTTP operations remain planned. See docs/api-contract.md for authority rules and
     explicitly unresolved/proposed choices; x-contract-decision marks proposals.
     Existing Module 1 operations and behavior are unchanged.
@@ -26,7 +26,8 @@ info:
       and password. Accounts begin as PENDING_APPROVAL with system role USER.
     - Administrator approval/rejection/block/unblock endpoints are implemented.
       Users V7 PROJECT_CREATE grants, V5/V6 foundations and POST /projects are merged.
-      Eligible-user lookup and membership GET/POST are implemented on feature/projects-team-management. Other Projects endpoints remain planned.
+      Eligible-user lookup and membership GET/POST are merged. Project GET list/details and PATCH details are
+      implemented on feature/projects-list-details-update; other Projects endpoints remain planned.
     - Updated main SecurityConfig allows PENDING_APPROVAL users to GET and PUT
       /users/me. /api/v1/notifications/** requires STATUS_ACTIVE; pending users
       cannot access notifications. Administrator routes require ROLE_ADMIN and
@@ -735,12 +736,12 @@ paths:
       - Projects
       operationId: listMyProjects
       summary: List accessible projects
-      x-implementation-status: planned
-      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+      x-implementation-status: implemented
+      description: 'Implemented on feature/projects-list-details-update, not yet main. Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
         per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
         non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
         returns 403. Authorization: ACTIVE authenticated actor; scope to own current memberships. No-project state
-        returns empty content; safe selector summaries only. Fixed createdAt DESC, id DESC proposed.'
+        returns empty content; safe selector summaries only. Fixed createdAt DESC, id DESC. Only page/size/status query parameters are supported. Page >= 0, size 1–100 and page*size <= 2147483647; unsupported offsets return safe 400.'
       security:
       - BearerAuth: []
       x-authorization: ACTIVE authenticated actor; scope to own current memberships.
@@ -774,8 +775,8 @@ paths:
       - Projects
       operationId: getProject
       summary: Read project
-      x-implementation-status: planned
-      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+      x-implementation-status: implemented
+      description: 'Implemented on feature/projects-list-details-update, not yet main. Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
         per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
         non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
         returns 403. Authorization: Current project participant (MANAGER, MEMBER, VIEWER); Viewer receives only whitelisted
@@ -811,11 +812,11 @@ paths:
       - Projects
       operationId: updateProject
       summary: Update project details
-      x-implementation-status: planned
-      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+      x-implementation-status: implemented
+      description: 'Implemented on feature/projects-list-details-update, not yet main. Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
         per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
         non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
-        returns 403. Authorization: Owner or additional MANAGER; not ordinary MEMBER/VIEWER. '
+        returns 403. Authorization: Owner or additional MANAGER; not ordinary MEMBER/VIEWER. Partial update requires at least one supported field. Text values must be JSON strings; only dates accept null. Unknown/protected fields are rejected. Omitted fields are retained, null dates are cleared, and the resulting complete date range is validated. The writable READ_COMMITTED transaction acquires the existing Users lifecycle lock before the Project row lock and rechecks current ACTIVE state and project authority. Ownership, creator, status and memberships are unchanged. '
       security:
       - BearerAuth: []
       x-authorization: Owner or additional MANAGER; not ordinary MEMBER/VIEWER.
@@ -851,7 +852,7 @@ paths:
       summary: Find ACTIVE users eligible for project membership
       x-implementation-status: implemented
       description: >-
-        Implemented on feature/projects-team-management, not yet main. Current ACTIVE Owner/MANAGER only.
+        Merged through PR #18. Current ACTIVE Owner/MANAGER only.
         Unknown or non-disclosable projects return 404; MEMBER/VIEWER return 403. Archived projects return 409.
         Users supplies minimal id/firstName/lastName/email data through a trusted Java service after Projects authorization.
         No general directory endpoint exists. A deliberately approved Users-owned SQL read uses NOT EXISTS against
@@ -895,7 +896,7 @@ paths:
       operationId: listProjectMembers
       summary: List internal team
       x-implementation-status: implemented
-      description: 'Implemented on feature/projects-team-management, not yet main. Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+      description: 'Merged through PR #18. Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
         per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
         non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
         returns 403. Authorization: Owner/MANAGER or MEMBER (TECHNICAL_LEAD, DEVELOPER, QA_TESTER); never VIEWER.
@@ -931,7 +932,7 @@ paths:
       operationId: addProjectMember
       summary: Add ACTIVE project participant
       x-implementation-status: implemented
-      description: 'Implemented on feature/projects-team-management, not yet main. Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+      description: 'Merged through PR #18. Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
         per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
         non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
         returns 403. Authorization: Owner or additional MANAGER; not ordinary MEMBER/VIEWER. Only Owner may add a

@@ -136,9 +136,9 @@ its sample Git commands, Java file lists and deployment procedures are context,
 not instructions to implement modules or release them in this change.
 
 OpenAPI version **0.3.0**, specification **3.0.3**, adds Projects (M2, Kelvin) and
-Work Items/Bugs (M3, Phoebe). POST `/projects` is merged into main. Eligible-user lookup
-and GET/POST project memberships are implemented on `feature/projects-team-management`;
-other M2/M3 HTTP operations remain planned. Existing Module 1 paths, operations, schemas,
+Work Items/Bugs (M3, Phoebe). Project creation, eligible-user lookup and membership GET/POST
+are merged into main. Project GET list/details and PATCH details are implemented on
+`feature/projects-list-details-update`; other M2/M3 HTTP operations remain planned. Existing Module 1 paths, operations, schemas,
 error definitions and public Auth security overrides are preserved. The earlier
 Module 1 sections above describe that baseline. This creation slice does not implement
 other M2/M3 endpoints, feature configuration, frontend screens or deployment changes.
@@ -435,7 +435,7 @@ See [Users permissions](users-permissions.md) for persistence, the Admin replace
 API and Projects transaction contract. V5 Projects foundation, V6 Work Items foundation
 and V7 organization permissions (including PROJECT_CREATE) are merged into main.
 POST `/api/v1/projects` is merged into main through PR #17. It creates the creator's designated Owner/MANAGER membership
-automatically. Eligible-user selection and membership GET/POST are implemented on the current team-management branch; membership updates/removal remain planned.
+automatically. Eligible-user selection and membership GET/POST are merged through PR #18; membership updates/removal remain planned.
 Existing migrations are preserved; the verified sequence is V1/V3/V4/V5/V6/V7.
 
 Compatibility clarification: the legacy draft permission route used an opaque
@@ -474,10 +474,10 @@ response shape and nested creation defaults are asserted. Automated evaluation o
 responses against the entire OpenAPI schema remains a follow-up; no new generic
 schema-validation infrastructure is introduced in this slice.
 
-## Project team management — feature/projects-team-management
+## Project team management — merged through PR #18
 
 POST `/projects` is merged through PR #17. The following additions are implemented
-on the team-management feature branch only; membership PATCH/DELETE, ownership
+in main through PR #18; membership PATCH/DELETE, ownership
 transfer, project archive/update and frontend work remain planned:
 
 | Endpoint | Authorization and behavior |
@@ -535,3 +535,39 @@ offsets return safe 400 INVALID_PROJECT_REQUEST; the exact maximum offset is acc
 (e.g. page=2147483647,size=1) and returns an empty page with the matching total when
 beyond the available rows. These bounds apply only to the team endpoints and the
 Users directory helper; no unrelated pagination behavior is changed.
+
+## Projects list, details and updates — feature/projects-list-details-update
+
+Project Creation (PR #17) and Team Management (PR #18) are merged. This branch adds
+only the following endpoints; other planned routes retain their existing status:
+
+| Endpoint | Behavior |
+| --- | --- |
+| GET `/projects` | ACTIVE actor's own memberships only; optional status filter; safe ProjectSummaryResponse pages |
+| GET `/projects/{projectId}` | Current ACTIVE participant; internal ProjectResponse for Owner/MANAGER/MEMBER, safe summary for VIEWER |
+| PATCH `/projects/{projectId}` | Current ACTIVE Owner/MANAGER only; partial brief/date update; archived projects reject writes |
+
+No ADMIN or PROJECT_CREATE bypass exists. The list query joins current project
+memberships in PostgreSQL, filters status before pagination/counting, and fixes
+createdAt DESC,id DESC ordering. Only status/page/size are accepted. Offset validation
+uses long arithmetic and the existing 2147483647 maximum. Empty memberships return
+empty content; hidden/missing project IDs return safe 404. Viewers never receive
+creator/Owner identifiers, briefs, team data, internal configuration or permissions.
+The summary contains only id/name/status plus the actor's role/responsibility/isOwner.
+Internal responses compute those permissions from the actor's actual membership;
+the approved empty optional-feature configuration/actions remain temporary defaults.
+
+PATCH tracks field presence: omitted values retain their current stored values;
+explicit null clears startDate/dueDate only. All six text fields require JSON strings;
+name must remain nonblank and <=200 characters. Unknown/protected properties,
+empty patches, malformed dates and invalid merged date ranges return safe 400.
+Validation applies after merging the patch with the locked current Project, so
+concurrent partial updates preserve each other's omitted fields. The outer writable
+READ_COMMITTED transaction reuses Users' existing ACTIVE-actor lifecycle guard
+before the Project row lock, then refreshes and rechecks authority/status. No new
+Users interface, permission grant, migration or ownership/membership change is needed.
+The complete transaction rolls back on failure; updatedAt changes on persisted edits.
+Owner transfer, archive, member PATCH/DELETE, feature settings and frontend work
+remain outside this slice. No new unresolved contract decisions are introduced;
+previous configurable-feature policy and generic response-schema validation remain
+follow-ups.

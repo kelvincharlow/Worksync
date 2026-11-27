@@ -50,6 +50,15 @@ public class Project {
         if (!isDateRangeValid()) throw new IllegalArgumentException("Invalid project date range");
     }
 
+    /** Controlled brief update only; validate the complete resulting dates before changing any field. */
+    public void updateDetails(String name,String description,String requirements,String scope,String deliverables,
+            String successCriteria,LocalDate startDate,LocalDate dueDate) {
+        if (name==null || name.isBlank() || name.length()>200) throw new IllegalArgumentException("Invalid project name");
+        if (startDate!=null && dueDate!=null && startDate.isAfter(dueDate)) throw new IllegalArgumentException("Invalid project date range");
+        this.name=name;this.description=description;this.requirements=requirements;this.scope=scope;
+        this.deliverables=deliverables;this.successCriteria=successCriteria;this.startDate=startDate;this.dueDate=dueDate;
+    }
+
     @AssertTrue(message = "startDate must not be after dueDate")
     @Transient
     public boolean isDateRangeValid() {
