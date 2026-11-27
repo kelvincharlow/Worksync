@@ -65,9 +65,9 @@ class ProjectAccessServiceTests {
                 }
                 expected=EnumSet.copyOf(expected);
                 expected.add(ProjectAction.VIEW_PROJECT);
-                if(role!=ProjectRole.VIEWER) expected.add(ProjectAction.VIEW_PROJECT_TEAM);
+                if(role!=ProjectRole.VIEWER) expected.addAll(Set.of(ProjectAction.VIEW_PROJECT_TEAM,ProjectAction.VIEW_PROJECT_CONFIGURATION));
                 if(role==ProjectRole.MANAGER) expected.addAll(Set.of(ProjectAction.UPDATE_PROJECT_DETAILS,
-                        ProjectAction.SELECT_ELIGIBLE_USERS,ProjectAction.ADD_PROJECT_MEMBER));
+                        ProjectAction.SELECT_ELIGIBLE_USERS,ProjectAction.ADD_PROJECT_MEMBER,ProjectAction.UPDATE_PROJECT_CONFIGURATION));
                 boolean allowed = expected.contains(action);
                 if (allowed) assertThatCode(() -> service.requireAction(projectId, actor, action)).doesNotThrowAnyException();
                 else assertThatThrownBy(() -> service.requireAction(projectId, actor, action)).isInstanceOf(ProjectAccessDeniedException.class);
@@ -97,7 +97,7 @@ class ProjectAccessServiceTests {
         setupMember(ProjectRole.MANAGER, null);
         ReflectionTestUtils.setField(project, "status", ProjectStatus.ARCHIVED);
         if (action == ProjectAction.VIEW_DELIVERY || action == ProjectAction.VIEW_INTERNAL_WORK
-                || action == ProjectAction.VIEW_PROJECT || action == ProjectAction.VIEW_PROJECT_TEAM)
+                || action == ProjectAction.VIEW_PROJECT || action == ProjectAction.VIEW_PROJECT_TEAM || action == ProjectAction.VIEW_PROJECT_CONFIGURATION)
             assertThatCode(() -> service.requireAction(projectId, actor, action)).doesNotThrowAnyException();
         else if(action==ProjectAction.ADD_PROJECT_MANAGER || action==ProjectAction.TRANSFER_PROJECT_OWNERSHIP)
             assertThatThrownBy(() -> service.requireAction(projectId, actor, action)).isInstanceOf(ProjectAccessDeniedException.class);

@@ -36,6 +36,6 @@ public class ProjectService {
                 request.requirements(), request.scope(), request.deliverables(), request.successCriteria(),
                 request.startDate(), request.dueDate()));
         members.saveAndFlush(new ProjectMember(project.getId(), actorUserId, ProjectRole.MANAGER, null));
-        return ProjectResponse.from(project, ProjectPermissionsResponse.initialOwner());
+        return ProjectResponse.from(project, ProjectPermissionsResponse.initialOwner(project));
     }
 }

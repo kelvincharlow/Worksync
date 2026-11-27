@@ -43,7 +43,7 @@ public class DefaultProjectAccessService implements ProjectAccessService {
         boolean internal = member.role() != ProjectRole.VIEWER;
         boolean allowed = switch (action) {
             case VIEW_PROJECT,VIEW_PROJECT_TEAM,UPDATE_PROJECT_DETAILS,SELECT_ELIGIBLE_USERS,
-                    ADD_PROJECT_MEMBER,ADD_PROJECT_MANAGER,TRANSFER_PROJECT_OWNERSHIP -> ProjectCapabilities.roleAllows(member.role(),member.isOwner(),action);
+                    ADD_PROJECT_MEMBER,ADD_PROJECT_MANAGER,TRANSFER_PROJECT_OWNERSHIP,VIEW_PROJECT_CONFIGURATION,UPDATE_PROJECT_CONFIGURATION -> ProjectCapabilities.roleAllows(member.role(),member.isOwner(),action);
             case VIEW_DELIVERY -> true;
             case VIEW_INTERNAL_WORK, REPORT_BUG -> internal;
             case CREATE_EPIC, CREATE_STORY, ASSIGN_WORK, TRIAGE_BUG, DESIGNATE_BUG_VERIFIER -> manager || lead;

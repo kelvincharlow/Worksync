@@ -138,10 +138,10 @@ not instructions to implement modules or release them in this change.
 OpenAPI version **0.3.0**, specification **3.0.3**, adds Projects (M2, Kelvin) and
 Work Items/Bugs (M3, Phoebe). Project creation, eligible-user lookup and membership GET/POST
 are merged into main. Project GET list/details and PATCH details are merged through PR #19. Effective permissions
-is merged through PR #20; ownership transfer is implemented on `feature/projects-membership-lifecycle`; other M2/M3 HTTP operations remain planned. Existing Module 1 paths, operations, schemas,
+is merged through PR #20; ownership transfer is merged through PR #21. Configuration GET/PATCH is implemented on `feature/projects-configuration`; other M2/M3 HTTP operations remain planned. Existing Module 1 paths, operations, schemas,
 error definitions and public Auth security overrides are preserved. The earlier
 Module 1 sections above describe that baseline. This creation slice does not implement
-other M2/M3 endpoints, feature configuration, frontend screens or deployment changes.
+other M2/M3 endpoints, feature activation, frontend screens or deployment changes.
 
 ### Shared authorization and architecture
 
@@ -459,15 +459,16 @@ Dates may be omitted or null and retain the existing date parsing rules.
 Safe responses use 400 for invalid bodies, 401 for unauthenticated callers, 403 for
 missing effective permission (pending accounts receive 403; Auth rejects blocked/rejected tokens with 401), and 409 for persistence conflicts after rollback.
 
-Initial creation response defaults are temporary and explicitly approved for this slice:
-`permissions.role=MANAGER`, `responsibility=null`, `isOwner=true`; actions now reflect the
-seven implemented Owner capabilities (see effective permissions below).
-`configuration.enabledViews=[]`, `configuration.enabledWorkTypes=[]`. Overview and Planning
-remain mandatory. No configurable-feature persistence, additional permission grants or
-Work Item functionality is enabled. Only currently implemented project API capabilities
-may be advertised; implemented Projects actions are now calculated as documented below. The configurable-feature
-policy remains pending team review. Creation-only Owner metadata is not reused for other
-actors; internal responses calculate role/Owner/actions from the current membership. This creation slice did not include membership management, project update/archive or frontend endpoints; see the team-management slice below.
+Project creation returns `permissions.role=MANAGER`, `responsibility=null`,
+`isOwner=true` and the nine currently implemented Owner capabilities.
+V8 persists project configuration. Existing and newly created projects default to
+`configuration.enabledViews=[]` and `configuration.enabledWorkTypes=[]`.
+GET/PATCH configuration is implemented on `feature/projects-configuration`, not
+merged into main. Overview and Planning remain mandatory. Optional feature
+activation remains unavailable pending frontend readiness and Work Items enforcement
+agreement. Only implemented backend capabilities are advertised. Creation-only Owner
+metadata is not reused for other actors; internal responses derive their role,
+Owner designation and actions from current membership.
 
 Project creation tests include a real deferred Owner/MANAGER foreign-key failure at
 outer commit, not only a simulated repository exception. The complete populated
@@ -478,7 +479,7 @@ schema-validation infrastructure is introduced in this slice.
 ## Project team management — merged through PR #18
 
 POST `/projects` is merged through PR #17. The following additions are implemented
-in main through PR #18; membership PATCH/DELETE, ownership
+in main through PR #18; membership PATCH/DELETE,
 project archiving and frontend work remain planned; ownership transfer is implemented in the slice below, and project details updates are merged through PR #19:
 
 | Endpoint | Authorization and behavior |
@@ -556,7 +557,7 @@ empty content; hidden/missing project IDs return safe 404. Viewers never receive
 creator/Owner identifiers, briefs, team data, internal configuration or permissions.
 The summary contains only id/name/status plus the actor's role/responsibility/isOwner.
 Internal responses compute those permissions from the actor's actual membership;
-the approved empty optional-feature configuration remains temporary; actions reflect current implemented capabilities.
+optional-feature configuration is now persisted by V8, with empty defaults and activation disabled; actions reflect current implemented capabilities.
 
 PATCH tracks field presence: omitted values retain their current stored values;
 explicit null clears startDate/dueDate only. All six text fields require JSON strings;
@@ -585,27 +586,26 @@ The approved action-vocabulary update describes implemented Projects APIs only:
 
 | Participant | ACTIVE project actions |
 | --- | --- |
-| Owner | VIEW_PROJECT, VIEW_PROJECT_TEAM, UPDATE_PROJECT_DETAILS, SELECT_ELIGIBLE_USERS, ADD_PROJECT_MEMBER, ADD_PROJECT_MANAGER, TRANSFER_PROJECT_OWNERSHIP |
-| Additional MANAGER | VIEW_PROJECT, VIEW_PROJECT_TEAM, UPDATE_PROJECT_DETAILS, SELECT_ELIGIBLE_USERS, ADD_PROJECT_MEMBER |
-| MEMBER / TECHNICAL_LEAD | VIEW_PROJECT, VIEW_PROJECT_TEAM |
-| MEMBER / DEVELOPER | VIEW_PROJECT, VIEW_PROJECT_TEAM |
-| MEMBER / QA_TESTER | VIEW_PROJECT, VIEW_PROJECT_TEAM |
+| Owner | VIEW_PROJECT, VIEW_PROJECT_TEAM, VIEW_PROJECT_CONFIGURATION, UPDATE_PROJECT_DETAILS, UPDATE_PROJECT_CONFIGURATION, SELECT_ELIGIBLE_USERS, ADD_PROJECT_MEMBER, ADD_PROJECT_MANAGER, TRANSFER_PROJECT_OWNERSHIP |
+| Additional MANAGER | VIEW_PROJECT, VIEW_PROJECT_TEAM, VIEW_PROJECT_CONFIGURATION, UPDATE_PROJECT_DETAILS, UPDATE_PROJECT_CONFIGURATION, SELECT_ELIGIBLE_USERS, ADD_PROJECT_MEMBER |
+| MEMBER / TECHNICAL_LEAD | VIEW_PROJECT, VIEW_PROJECT_TEAM, VIEW_PROJECT_CONFIGURATION |
+| MEMBER / DEVELOPER | VIEW_PROJECT, VIEW_PROJECT_TEAM, VIEW_PROJECT_CONFIGURATION |
+| MEMBER / QA_TESTER | VIEW_PROJECT, VIEW_PROJECT_TEAM, VIEW_PROJECT_CONFIGURATION |
 | VIEWER | VIEW_PROJECT |
 
 Archived projects retain only viewing actions: VIEW_PROJECT for everyone and
-VIEW_PROJECT_TEAM for Owner/MANAGER/MEMBER. ADD_PROJECT_MEMBER means adding MEMBER
+VIEW_PROJECT_TEAM and VIEW_PROJECT_CONFIGURATION for Owner/MANAGER/MEMBER. ADD_PROJECT_MEMBER means adding MEMBER
 or VIEWER, with existing responsibility rules; only Owner may ADD_PROJECT_MANAGER.
 Ownership transfer is now advertised only to the ACTIVE Owner of a non-archived project.
-Demotion, member removal, archive and feature-configuration capabilities remain unadvertised. Work Items and delivery enum
+Demotion, member removal and archive capabilities remain unadvertised. Configuration read/update actions are implemented on feature/projects-configuration. Work Items and delivery enum
 values remain in the draft/shared authorization vocabulary, but are excluded from
 these UI hints until backend functionality and enabled-feature policy support them.
 Existing Work Items authorization behavior is not changed by this endpoint.
 
 Internal ProjectPermissionsResponse includes role, primary responsibility,
-isOwner, current actions and empty enabledViews/enabledWorkTypes. Existing creation
+isOwner, current actions and the persisted enabledViews/enabledWorkTypes. Existing creation
 and internal details/update responses use the same shared calculation. Overview
-and Planning remain mandatory; no persisted feature settings or work enablement
-are introduced. VIEWER uses a separate closed DTO with role VIEWER, null
+and Planning remain mandatory; V8 persists feature settings without enabling work functionality. VIEWER uses a separate closed DTO with role VIEWER, null
 responsibility, isOwner false, actions [VIEW_PROJECT], availableDeliveryFeatures [].
 It contains no configuration, account/participant identifiers or internal controls.
 Future delivery availability never implies publication approval.
@@ -613,14 +613,11 @@ Future delivery availability never implies publication approval.
 Action responses are descriptive navigation/presentation snapshots, not write
 authorization. Each server operation continues to enforce current authority, and
 writes retain the existing V7 lifecycle-lock and Projects transaction boundaries.
-No new migration, security configuration, Users/Auth/Notifications/Work Items or
-frontend implementation is included. Optional-feature configuration, Work Items/
-delivery APIs and all other planned Projects mutations remain separate work.
+The effective-permissions slice introduced no migration or cross-module implementation. The configuration slice below adds V8 persistence; feature activation, Work Items/delivery APIs and other planned Projects mutations remain separate work.
 
-## Ownership transfer — feature/projects-membership-lifecycle
+## Ownership transfer — merged through PR #21
 
-POST `/api/v1/projects/{projectId}/ownership-transfer` is implemented on this branch,
-not yet main. Only the current ACTIVE designated Owner may call it. The body has
+POST `/api/v1/projects/{projectId}/ownership-transfer` is merged through PR #21. Only the current ACTIVE designated Owner may call it. The body has
 one required UUID `newOwnerUserId`; unknown/malformed/null values return safe 400.
 The target must be different, ACTIVE and an existing MANAGER in this same project.
 Self/inactive/non-Manager/non-member/missing targets return safe 409
@@ -649,3 +646,47 @@ Membership PATCH/DELETE and eligibility-reducing changes remain deferred pending
 agreement with Work Items on membership-impact assessment and a shared writer lock/
 recheck protocol. No cross-module reference query, Work Items change, migration,
 member role update/removal or new public user-directory endpoint is introduced.
+
+
+## Project configuration — feature/projects-configuration
+
+GET and PATCH `/api/v1/projects/{projectId}/configuration` are implemented on this
+feature branch, not yet main. Ownership transfer is merged through PR #21.
+V8 adds `project_enabled_views(project_id, view)` and
+`project_enabled_work_types(project_id, work_type)`, with composite primary keys,
+Projects foreign keys and allowed-value checks. Existing and new projects have
+empty collections; Overview and Planning are mandatory, outside these collections.
+This supersedes the earlier response-only temporary configuration defaults.
+
+GET requires a current ACTIVE Owner/MANAGER/MEMBER. VIEWER receives 403 for an
+accessible project; missing/non-disclosable projects return 404. ADMIN and
+PROJECT_CREATE provide no membership bypass. Authorized internal archived reads
+remain available. PATCH requires Owner/MANAGER and rejects archived projects with
+409. A writable READ_COMMITTED transaction holds the existing Users lifecycle lock
+before the Project row lock, refreshes current state and rechecks membership.
+Concurrent patches serialize; omitted collections are preserved, supplied arrays
+replace only that collection and empty arrays clear it atomically.
+
+All optional features remain unavailable: LIST, BOARD, EPIC, STORY, TASK and BUG.
+Every nonempty selection, including recognized values, returns sanitized 400.
+Unknown fields/values, duplicates, null collections/elements, scalar coercion and
+empty PATCH objects are also rejected. No API can activate an unavailable feature.
+Feature activation requires later agreement on frontend readiness and Work Items
+configuration enforcement, including existing-item access, hierarchy dependencies
+and writer locking/rechecks. Disabling settings never deletes or changes Work
+Items, assignments, relationships or history. No Work Items code is changed.
+
+Internal ProjectResponse and permissions/me return actual persisted settings;
+Viewer projections never contain configuration. VIEW_PROJECT_CONFIGURATION is
+advertised to internal participants, including on archived projects.
+UPDATE_PROJECT_CONFIGURATION is advertised to Owner/MANAGER only on ACTIVE
+projects. Existing Work Items/delivery actions remain unadvertised. These hints
+never replace endpoint authorization. No personal preferences are implemented.
+
+Configuration authorization refreshes the actor's managed membership before checking
+its role/responsibility, including when called from a writable outer transaction.
+PATCH performs that refresh only after acquiring Users lifecycle and Project row
+locks. Future membership writers must acquire the same lifecycle -> Project lock
+order before changing membership and recheck current authority; this slice does
+not implement membership role changes/removal. No caller may enter the write
+service while holding conflicting Project/membership locks ahead of lifecycle locks.
