@@ -24,7 +24,7 @@ info:
     - Public self-registration with first name, last name, email, phone number,
       and password. Accounts begin as PENDING_APPROVAL with system role USER.
     - Administrator approval/rejection/block/unblock endpoints are implemented.
-      Organization-level permission grants such as PROJECT_CREATE remain planned.
+      Users V7 implements direct PROJECT_CREATE grant replacement; project creation integration remains disabled.
     - Updated main SecurityConfig allows PENDING_APPROVAL users to GET and PUT
       /users/me. /api/v1/notifications/** requires STATUS_ACTIVE; pending users
       cannot access notifications. Administrator routes require ROLE_ADMIN and
@@ -515,19 +515,30 @@ paths:
 
   /admin/users/{userId}/permissions:
     patch:
-      tags: [Administration]
+      tags:
+      - Administration
       x-required-role: ADMIN
-      x-implementation-status: planned
+      x-implementation-status: implemented-users-v7
       operationId: updateUserPermissions
       summary: Set additional organization-level permissions
-      x-implementation-phase: later
-      description: |
-        ADMIN only. Replaces the complete collection of direct, additional
-        organization-level permissions for this user. Initially the only
-        planned grant is PROJECT_CREATE. Project-specific Manager/Member/Viewer
-        roles will be managed by project membership in a later module.
+      description: Currently ACTIVE system ADMIN only, rechecked from the database under the Users lifecycle lock.
+        Replaces the complete collection of directly granted organization permissions; [] revokes all. Only ACTIVE
+        targets may receive NEW grants. An inactive target may retain an unchanged existing grant or have it revoked;
+        it cannot exercise stored permissions. Unknown/missing/null values, duplicates and unknown properties return
+        400. Actor UUID comes only from WorkSyncPrincipal. Registration/approval/ADMIN role never grant PROJECT_CREATE
+        automatically. Repeated identical replacement preserves grant ID/grantor/timestamp. Response uses the safe
+        UserResponse shape including stored permissions and derived effectivePermissions; it satisfies UserRecord
+        fields. Permission replacement changes neither system role nor existing project ownership/membership. No audit
+        dashboard or permanent revocation event history is implemented.
       parameters:
-        - $ref: '#/components/parameters/UserId'
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: Existing Users UUID; this implemented endpoint does not accept example usr_ identifiers from
+          the legacy draft.
       requestBody:
         required: true
         content:
@@ -549,6 +560,13 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: An inactive target cannot receive a new permission grant. Code INVALID_PERMISSION_TARGET; safe
+            error body only.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
 
   /admin/users/{userId}/role:
     patch:
@@ -2504,7 +2522,18 @@ components:
     UserResponse:
       type: object
       description: Safe public/admin representation. Never contains password hashes.
-      required: [id, firstName, lastName, email, phoneNumber, role, status, createdAt, updatedAt]
+      required:
+      - id
+      - firstName
+      - lastName
+      - email
+      - phoneNumber
+      - role
+      - status
+      - createdAt
+      - updatedAt
+      - permissions
+      - effectivePermissions
       properties:
         id:
           type: string
@@ -2534,15 +2563,39 @@ components:
           type: string
           format: date-time
           example: '2026-11-10T08:30:00Z'
+        permissions:
+          type: array
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/OrganizationPermission'
+          description: Directly stored organization grants; may remain stored on an inactive account. Not authorization
+            for a write.
+        effectivePermissions:
+          type: array
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/OrganizationPermission'
+          readOnly: true
+          description: Stored grants only while status is ACTIVE; otherwise empty. Display snapshot only; future writes
+            recheck current database state under the Users lock.
 
     UserRecord:
       type: object
       description: Safe public/admin representation. Never contains password hashes.
-      required: [id, firstName, lastName, email, phoneNumber, role, status, permissions, createdAt]
+      required:
+      - id
+      - firstName
+      - lastName
+      - email
+      - phoneNumber
+      - role
+      - status
+      - permissions
+      - createdAt
       properties:
         id:
           type: string
-          example: 'usr_101'
+          example: usr_101
         firstName:
           type: string
           example: Jane
@@ -2563,10 +2616,10 @@ components:
         permissions:
           type: array
           uniqueItems: true
-          description: Extra organization-level permissions; not project roles.
           items:
             $ref: '#/components/schemas/OrganizationPermission'
-          example: []
+          description: Directly stored organization grants; may remain stored on an inactive account. Not authorization
+            for a write.
         createdAt:
           type: string
           format: date-time
@@ -2575,6 +2628,14 @@ components:
           type: string
           format: date-time
           example: '2026-11-10T08:30:00Z'
+        effectivePermissions:
+          type: array
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/OrganizationPermission'
+          readOnly: true
+          description: Stored grants only while status is ACTIVE; otherwise empty. Display snapshot only; future writes
+            recheck current database state under the Users lock.
 
     AuthResponse:
       type: object
@@ -2661,14 +2722,18 @@ components:
     UpdatePermissionsRequest:
       type: object
       additionalProperties: false
-      required: [permissions]
+      required:
+      - permissions
       properties:
         permissions:
           type: array
           uniqueItems: true
           items:
             $ref: '#/components/schemas/OrganizationPermission'
-          example: [PROJECT_CREATE]
+          example:
+          - PROJECT_CREATE
+      description: Complete replacement. Required non-null collection of supported names; no nulls, duplicate values
+        or unknown properties. Empty array revokes all grants.
 
     UpdateSystemRoleRequest:
       type: object

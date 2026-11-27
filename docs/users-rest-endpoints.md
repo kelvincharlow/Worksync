@@ -1,7 +1,6 @@
 # Users REST endpoints — Step 5B Parts 1 and 2
 
-The profile/read routes and three lifecycle routes below are implemented on
-`feature/users-admin-actions`.
+The profile/read routes and three lifecycle routes below are implemented in main.
 Auth registration, login and password-reset endpoints are implemented in main,
 not by Users Step 5B. The merged Auth and Notifications email modules are integrated.
 These routes reuse Auth's SecurityConfig, JwtFilter and WorkSyncPrincipal.
@@ -17,6 +16,7 @@ through UserService on every request. Controllers never access UserRepository.
 | PATCH /api/v1/admin/users/{userId}/approve | ACTIVE ADMIN | PENDING_APPROVAL → ACTIVE |
 | PATCH /api/v1/admin/users/{userId}/reject | ACTIVE ADMIN | PENDING_APPROVAL → REJECTED |
 | PATCH /api/v1/admin/users/{userId}/status | ACTIVE ADMIN | ACTIVE ↔ BLOCKED |
+| PATCH /api/v1/admin/users/{userId}/permissions | ACTIVE ADMIN | Replace complete direct permission collection (Users V7) |
 
 PUT requires firstName and lastName (nonblank, at most 80 characters), plus
 phoneNumber in E.164 format. All other JSON properties are rejected with 400,
@@ -24,7 +24,7 @@ including email, IDs, role, status, permissions and credentials. The authenticat
 principal supplies the target UUID. A query parameter cannot change that identity.
 
 UserResponse has UUID id, firstName, lastName, email, phoneNumber, role, status,
-createdAt and updatedAt. Password hashes never appear in public responses.
+createdAt, updatedAt, stored permissions and derived effectivePermissions. Password hashes never appear in public responses.
 
 The list accepts optional status (an exact AccountStatus enum value), page
 (default 0, minimum 0), and size (default 20, range 1–100). Database pagination
@@ -104,7 +104,7 @@ password-reset and mocked-email regression tests are retained.
 Auth's token validation checks signature, issuer and expiration; it currently
 does not require an audience. Token lifecycle, CORS and other Auth policy remain
 the Auth owner's responsibility. No Auth production code is changed here.
-Role/permission management and in-app notification endpoints remain planned and
+System-role management and in-app notification endpoints remain planned and
 outside this step.
 
 Auth's password-reset paths differ from the draft OpenAPI; see the
@@ -128,3 +128,6 @@ separate reviewed draft contract.
 These annotations describe authentication only. Existing SecurityConfig, JwtFilter,
 principal checks and UserService lifecycle guards enforce all actual access,
 including ACTIVE ADMIN, self-blocking and last-admin restrictions.
+
+
+Users V7 adds organization permission replacement; see [Users permissions](users-permissions.md). No Projects creation endpoint or V7 integration into ProjectService is enabled by this change.

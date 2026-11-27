@@ -1,6 +1,9 @@
 package com.eclectics.worksync.users.controller;
 
 import com.eclectics.worksync.users.dto.UserErrorResponse;
+import com.eclectics.worksync.users.exception.InvalidPermissionRequestException;
+import com.eclectics.worksync.users.exception.InvalidPermissionTargetException;
+import com.eclectics.worksync.users.exception.OrganizationPermissionDeniedException;
 import com.eclectics.worksync.users.exception.UserNotFoundException;
 import com.eclectics.worksync.users.exception.InvalidAccountStatusTransitionException;
 import com.eclectics.worksync.users.exception.ProtectedAdministratorOperationException;
@@ -46,9 +49,21 @@ public class UserExceptionHandler {
                         "Administrator access is required", Instant.now()));
     }
 
+    @ExceptionHandler(InvalidPermissionTargetException.class)
+    public ResponseEntity<UserErrorResponse> invalidPermissionTarget() {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new UserErrorResponse("INVALID_PERMISSION_TARGET", "Only ACTIVE users may receive new grants", Instant.now()));
+    }
+
+    @ExceptionHandler(OrganizationPermissionDeniedException.class)
+    public ResponseEntity<UserErrorResponse> permissionDenied() {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new UserErrorResponse("ORGANIZATION_PERMISSION_REQUIRED", "Organization permission required", Instant.now()));
+    }
+
     @ExceptionHandler({MethodArgumentNotValidException.class, HttpMessageNotReadableException.class,
             HandlerMethodValidationException.class, MethodArgumentTypeMismatchException.class,
-            ConstraintViolationException.class})
+            ConstraintViolationException.class, InvalidPermissionRequestException.class})
     public ResponseEntity<UserErrorResponse> invalidInput() {
         // Never echo parser errors, rejected field values or service exception objects.
         return ResponseEntity.badRequest()

@@ -18,6 +18,20 @@ import jakarta.validation.Validator;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.EnumSet;
+import com.eclectics.worksync.users.dto.UpdatePermissionsRequest;
+import com.eclectics.worksync.users.entity.OrganizationPermission;
+import com.eclectics.worksync.users.entity.UserPermission;
+import com.eclectics.worksync.users.repository.UserPermissionRepository;
+import com.eclectics.worksync.users.exception.InvalidPermissionRequestException;
+import com.eclectics.worksync.users.exception.InvalidPermissionTargetException;
+import com.eclectics.worksync.users.exception.OrganizationPermissionDeniedException;
+import com.eclectics.worksync.users.exception.PermissionTransactionRequiredException;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -37,11 +51,13 @@ import java.sql.Connection;
 @Transactional(readOnly = true)
 public class UserService {
     private final UserRepository repository;
+    private final UserPermissionRepository permissions;
     private final Validator validator;
     private final EntityManager entityManager;
 
-    public UserService(UserRepository repository, Validator validator, EntityManager entityManager) {
+    public UserService(UserRepository repository, Validator validator, EntityManager entityManager, UserPermissionRepository permissions) {
         this.repository = repository;
+        this.permissions = permissions;
         this.validator = validator;
         this.entityManager = entityManager;
     }
@@ -65,12 +81,12 @@ public class UserService {
                 normalized.phoneNumber(), normalized.passwordHash());
         // The unique index remains authoritative for concurrent registrations.
         // Let database failures escape for rollback; translate outside the transaction later.
-        return UserResponse.from(repository.saveAndFlush(user));
+        return response(repository.saveAndFlush(user));
     }
 
     /** Returns safe account details or throws UserNotFoundException. */
     public UserResponse getUserById(UUID userId) {
-        return UserResponse.from(requireUser(userId));
+        return response(requireUser(userId));
     }
 
     /** Safe internal lookup only; this is not an authentication credential lookup. */
@@ -81,7 +97,7 @@ public class UserService {
             throw new ConstraintViolationException(violations);
         }
         return repository.findByEmail(normalized)
-                .map(UserResponse::from)
+                .map(this::response)
                 .orElseThrow(UserNotFoundException::new);
     }
 
@@ -138,7 +154,7 @@ public class UserService {
         user.setLastName(request.lastName());
         user.setPhoneNumber(request.phoneNumber());
         // Flush lifecycle callbacks so the response includes the new updatedAt value.
-        return UserResponse.from(repository.saveAndFlush(user));
+        return response(repository.saveAndFlush(user));
     }
 
     // Trusted internal one-argument methods retain existing lifecycle behavior.
@@ -151,7 +167,7 @@ public class UserService {
         lockAccountLifecycle();
         User user = requireLifecycleUser(userId);
         user.approve();
-        return UserResponse.from(repository.saveAndFlush(user));
+        return response(repository.saveAndFlush(user));
     }
 
     /** Rejects a pending registration without changing its role or credentials. */
@@ -160,7 +176,7 @@ public class UserService {
         lockAccountLifecycle();
         User user = requireLifecycleUser(userId);
         user.reject();
-        return UserResponse.from(repository.saveAndFlush(user));
+        return response(repository.saveAndFlush(user));
     }
 
     /** Blocks an active account; this cannot be used to reject a pending registration. */
@@ -173,7 +189,7 @@ public class UserService {
             throw new ProtectedAdministratorOperationException();
         }
         user.block();
-        return UserResponse.from(repository.saveAndFlush(user));
+        return response(repository.saveAndFlush(user));
     }
 
     /** Restores a blocked account to ACTIVE; this cannot approve pending/rejected users. */
@@ -182,7 +198,7 @@ public class UserService {
         lockAccountLifecycle();
         User user = requireLifecycleUser(userId);
         user.unblock();
-        return UserResponse.from(repository.saveAndFlush(user));
+        return response(repository.saveAndFlush(user));
     }
 
     /** Auth's principal supplies actorId; recheck authorization after acquiring the shared lock. */
@@ -211,6 +227,77 @@ public class UserService {
     public UserResponse unblockUser(UUID actorId, UUID userId) {
         requireActiveAdministrator(actorId);
         return unblockUser(userId);
+    }
+
+    /** Complete direct-grant replacement; same lock/order as account lifecycle mutations. */
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public UserResponse updatePermissions(UUID actorUserId, UUID targetUserId, UpdatePermissionsRequest request) {
+        Objects.requireNonNull(request, "request is required");
+        validate(request);
+        if (new HashSet<>(request.permissions()).size() != request.permissions().size()) {
+            throw new InvalidPermissionRequestException();
+        }
+        Set<OrganizationPermission> desired = Set.copyOf(request.permissions());
+        requireActiveAdministrator(actorUserId); // lock first, refresh actor, then refresh target
+        User target = requireLifecycleUser(targetUserId);
+        Set<OrganizationPermission> stored = permissions.findPermissionsByUserId(targetUserId);
+        Set<OrganizationPermission> additions = new HashSet<>(desired);
+        additions.removeAll(stored);
+        // Inactive accounts can be stripped of grants; only new grants require an ACTIVE target.
+        if (!additions.isEmpty() && target.getStatus() != AccountStatus.ACTIVE) {
+            throw new InvalidPermissionTargetException();
+        }
+        for (OrganizationPermission existing : stored) {
+            if (!desired.contains(existing)) permissions.deleteGrant(targetUserId, existing);
+        }
+        for (OrganizationPermission addition : additions) {
+            permissions.save(new UserPermission(targetUserId, addition, actorUserId));
+        }
+        permissions.flush();
+        return response(target);
+    }
+
+    /** Stored grants for trusted callers; not effective authorization and not a new HTTP endpoint. */
+    public Set<OrganizationPermission> getGrantedPermissions(UUID userId) {
+        requireUser(userId);
+        return Set.copyOf(permissions.findPermissionsByUserId(userId));
+    }
+
+    /** Current, serialized read for display/decisions; its transaction ends on return if called alone.
+     * Writes must use requirePermissionForWrite inside their own transaction instead.
+     */
+    @Transactional(isolation = Isolation.READ_COMMITTED, readOnly = false)
+    public boolean hasPermission(UUID userId, OrganizationPermission permission) {
+        Objects.requireNonNull(permission, "permission is required");
+        lockAccountLifecycle();
+        User user = requireLifecycleUser(userId);
+        return user.getStatus() == AccountStatus.ACTIVE
+                && permissions.findPermissionsByUserId(userId).contains(permission);
+    }
+
+    /** Trusted cross-module write guard. MUST join the caller's writable READ_COMMITTED transaction.
+     * Acquire before Projects/Work Items row locks. The Users lock stays held until the OUTER commit.
+     * Refresh account state and query scalar grants after locking; never trust JWT/DTO/cache snapshots.
+     * MANDATORY prevents checking in a short separate transaction then writing after revocation.
+     */
+    @Transactional(propagation = Propagation.MANDATORY, isolation = Isolation.READ_COMMITTED, readOnly = false)
+    public void requirePermissionForWrite(UUID userId, OrganizationPermission permission) {
+        Objects.requireNonNull(permission, "permission is required");
+        if (TransactionSynchronizationManager.isCurrentTransactionReadOnly()
+                || !Integer.valueOf(Connection.TRANSACTION_READ_COMMITTED).equals(
+                    TransactionSynchronizationManager.getCurrentTransactionIsolationLevel())) {
+            throw new PermissionTransactionRequiredException();
+        }
+        lockAccountLifecycle();
+        User user = requireLifecycleUser(userId);
+        if (user.getStatus() != AccountStatus.ACTIVE
+                || !permissions.findPermissionsByUserId(userId).contains(permission)) {
+            throw new OrganizationPermissionDeniedException();
+        }
+    }
+
+    private UserResponse response(User user) {
+        return UserResponse.from(user, permissions.findPermissionsByUserId(user.getId()));
     }
 
     private void lockAccountLifecycle() {
@@ -244,13 +331,25 @@ public class UserService {
     public Page<UserResponse> getUsersByStatus(AccountStatus status, Pageable pageable) {
         Objects.requireNonNull(status, "status is required");
         Objects.requireNonNull(pageable, "pageable is required");
-        return repository.findByStatus(status, pageable).map(UserResponse::from);
+        return responsePage(repository.findByStatus(status, pageable));
     }
 
     /** Internal administrator listing without a status filter; caller authorization is still required. */
     public Page<UserResponse> getUsers(Pageable pageable) {
         Objects.requireNonNull(pageable, "pageable is required");
-        return repository.findAll(pageable).map(UserResponse::from);
+        return responsePage(repository.findAll(pageable));
+    }
+
+    /** Only the current page's IDs are queried; no grant query is needed for an empty page. */
+    private Page<UserResponse> responsePage(Page<User> page) {
+        if (page.isEmpty()) return page.map(UserResponse::from);
+        var userIds = page.getContent().stream().map(User::getId).toList();
+        Map<UUID, Set<OrganizationPermission>> byUser = new HashMap<>();
+        for (var grant : permissions.findPermissionsForUsers(userIds)) {
+            byUser.computeIfAbsent(grant.getUserId(), id -> EnumSet.noneOf(OrganizationPermission.class))
+                    .add(grant.getPermission());
+        }
+        return page.map(user -> UserResponse.from(user, byUser.getOrDefault(user.getId(), Set.of())));
     }
 
     private User requireUser(UUID userId) {
