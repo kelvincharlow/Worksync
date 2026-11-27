@@ -128,7 +128,7 @@ Finalize JWT signing/key rotation, token lifetime, browser storage, CORS/CSRF be
 
 Email verification, rate limiting/abuse protection, administrator MFA as appropriate, and a complete token lifecycle policy remain production-readiness work outside Users Step 5B. Password-reset code is implemented in main, with the path mismatch noted above; this step does not assess its production readiness. Email delivery failure must not roll back an otherwise successful registration or approval.
 
-## Modules 2 and 3 — V13 contract extension (planned)
+## Modules 2 and 3 — V13 contract extension (operation-level implementation status)
 
 Source: `WorkSync_M2_M3_Implementation_Agreement_V13_Kelvin_Phoebe.docx`,
 23 November 2026, read in full. This agreement supplies contract requirements;
@@ -137,8 +137,8 @@ not instructions to implement modules or release them in this change.
 
 OpenAPI version **0.3.0**, specification **3.0.3**, adds Projects (M2, Kelvin) and
 Work Items/Bugs (M3, Phoebe). Project creation, eligible-user lookup and membership GET/POST
-are merged into main. Project GET list/details and PATCH details are implemented on
-`feature/projects-list-details-update`; other M2/M3 HTTP operations remain planned. Existing Module 1 paths, operations, schemas,
+are merged into main. Project GET list/details and PATCH details are merged through PR #19. Effective permissions
+is implemented on `feature/projects-effective-permissions`; other M2/M3 HTTP operations remain planned. Existing Module 1 paths, operations, schemas,
 error definitions and public Auth security overrides are preserved. The earlier
 Module 1 sections above describe that baseline. This creation slice does not implement
 other M2/M3 endpoints, feature configuration, frontend screens or deployment changes.
@@ -268,9 +268,9 @@ actions and authorized project configuration. Internal ProjectResponse also uses
 that internal permissions variant.
 
 VIEWER receives ViewerProjectPermissionsResponse only: role VIEWER, null
-responsibility, isOwner false, actions containing only VIEW_DELIVERY, and
-availableDeliveryFeatures restricted to DELIVERY_SUMMARY, MILESTONES and
-DELIVERY_PROGRESS. Availability is computed server-side for existing delivery
+responsibility, isOwner false, actions containing only VIEW_PROJECT, and
+availableDeliveryFeatures currently empty. DELIVERY_SUMMARY, MILESTONES and
+DELIVERY_PROGRESS remain future values until those delivery APIs are implemented. Availability is computed server-side for existing delivery
 surfaces; it never means data is approved for publication. Unpublished content
 remains omitted/null. No configuration, enabled work types, LIST/BOARD options,
 internal reports or administrative capabilities appear in the Viewer shape;
@@ -460,13 +460,14 @@ Safe responses use 400 for invalid bodies, 401 for unauthenticated callers, 403 
 missing effective permission (pending accounts receive 403; Auth rejects blocked/rejected tokens with 401), and 409 for persistence conflicts after rollback.
 
 Initial creation response defaults are temporary and explicitly approved for this slice:
-`permissions.role=MANAGER`, `responsibility=null`, `isOwner=true`, `actions=[]`,
+`permissions.role=MANAGER`, `responsibility=null`, `isOwner=true`; actions now reflect the
+six implemented Owner capabilities (see effective permissions below).
 `configuration.enabledViews=[]`, `configuration.enabledWorkTypes=[]`. Overview and Planning
 remain mandatory. No configurable-feature persistence, additional permission grants or
 Work Item functionality is enabled. Only currently implemented project API capabilities
-may be advertised; no follow-on project actions are advertised yet. The configurable-feature
-policy remains pending team review. These creation-only defaults must not be reused as a
-general authorization projection for future project read/member APIs. This creation slice did not include membership management, project update/archive or frontend endpoints; see the team-management slice below.
+may be advertised; implemented Projects actions are now calculated as documented below. The configurable-feature
+policy remains pending team review. Creation-only Owner metadata is not reused for other
+actors; internal responses calculate role/Owner/actions from the current membership. This creation slice did not include membership management, project update/archive or frontend endpoints; see the team-management slice below.
 
 Project creation tests include a real deferred Owner/MANAGER foreign-key failure at
 outer commit, not only a simulated repository exception. The complete populated
@@ -478,7 +479,7 @@ schema-validation infrastructure is introduced in this slice.
 
 POST `/projects` is merged through PR #17. The following additions are implemented
 in main through PR #18; membership PATCH/DELETE, ownership
-transfer, project archive/update and frontend work remain planned:
+transfer, project archiving and frontend work remain planned; project details updates are merged through PR #19:
 
 | Endpoint | Authorization and behavior |
 | --- | --- |
@@ -536,10 +537,10 @@ offsets return safe 400 INVALID_PROJECT_REQUEST; the exact maximum offset is acc
 beyond the available rows. These bounds apply only to the team endpoints and the
 Users directory helper; no unrelated pagination behavior is changed.
 
-## Projects list, details and updates — feature/projects-list-details-update
+## Projects list, details and updates — merged through PR #19
 
-Project Creation (PR #17) and Team Management (PR #18) are merged. This branch adds
-only the following endpoints; other planned routes retain their existing status:
+Project Creation (PR #17), Team Management (PR #18), and these list/details/update
+endpoints (PR #19) are merged; other planned routes retain their existing status:
 
 | Endpoint | Behavior |
 | --- | --- |
@@ -555,7 +556,7 @@ empty content; hidden/missing project IDs return safe 404. Viewers never receive
 creator/Owner identifiers, briefs, team data, internal configuration or permissions.
 The summary contains only id/name/status plus the actor's role/responsibility/isOwner.
 Internal responses compute those permissions from the actor's actual membership;
-the approved empty optional-feature configuration/actions remain temporary defaults.
+the approved empty optional-feature configuration remains temporary; actions reflect current implemented capabilities.
 
 PATCH tracks field presence: omitted values retain their current stored values;
 explicit null clears startDate/dueDate only. All six text fields require JSON strings;
@@ -571,3 +572,48 @@ Owner transfer, archive, member PATCH/DELETE, feature settings and frontend work
 remain outside this slice. No new unresolved contract decisions are introduced;
 previous configurable-feature policy and generic response-schema validation remain
 follow-ups.
+
+## Effective project permissions — feature/projects-effective-permissions
+
+GET `/api/v1/projects/{projectId}/permissions/me` is implemented on this branch,
+not yet main. Identity comes only from WorkSyncPrincipal. The read-only service
+reuses ProjectAccessService.getMemberAccess, which checks current ACTIVE account,
+current membership/responsibility, Owner designation and project lifecycle from the
+database. Missing or non-disclosable projects return safe 404; neither ADMIN nor a
+PROJECT_CREATE organization grant bypasses membership.
+
+The approved action-vocabulary update describes implemented Projects APIs only:
+
+| Participant | ACTIVE project actions |
+| --- | --- |
+| Owner | VIEW_PROJECT, VIEW_PROJECT_TEAM, UPDATE_PROJECT_DETAILS, SELECT_ELIGIBLE_USERS, ADD_PROJECT_MEMBER, ADD_PROJECT_MANAGER |
+| Additional MANAGER | VIEW_PROJECT, VIEW_PROJECT_TEAM, UPDATE_PROJECT_DETAILS, SELECT_ELIGIBLE_USERS, ADD_PROJECT_MEMBER |
+| MEMBER / TECHNICAL_LEAD | VIEW_PROJECT, VIEW_PROJECT_TEAM |
+| MEMBER / DEVELOPER | VIEW_PROJECT, VIEW_PROJECT_TEAM |
+| MEMBER / QA_TESTER | VIEW_PROJECT, VIEW_PROJECT_TEAM |
+| VIEWER | VIEW_PROJECT |
+
+Archived projects retain only viewing actions: VIEW_PROJECT for everyone and
+VIEW_PROJECT_TEAM for Owner/MANAGER/MEMBER. ADD_PROJECT_MEMBER means adding MEMBER
+or VIEWER, with existing responsibility rules; only Owner may ADD_PROJECT_MANAGER.
+No demotion, transfer, member removal, archive or feature-configuration capability
+is advertised while those endpoints remain planned. Work Items and delivery enum
+values remain in the draft/shared authorization vocabulary, but are excluded from
+these UI hints until backend functionality and enabled-feature policy support them.
+Existing Work Items authorization behavior is not changed by this endpoint.
+
+Internal ProjectPermissionsResponse includes role, primary responsibility,
+isOwner, current actions and empty enabledViews/enabledWorkTypes. Existing creation
+and internal details/update responses use the same shared calculation. Overview
+and Planning remain mandatory; no persisted feature settings or work enablement
+are introduced. VIEWER uses a separate closed DTO with role VIEWER, null
+responsibility, isOwner false, actions [VIEW_PROJECT], availableDeliveryFeatures [].
+It contains no configuration, account/participant identifiers or internal controls.
+Future delivery availability never implies publication approval.
+
+Action responses are descriptive navigation/presentation snapshots, not write
+authorization. Each server operation continues to enforce current authority, and
+writes retain the existing V7 lifecycle-lock and Projects transaction boundaries.
+No new migration, security configuration, Users/Auth/Notifications/Work Items or
+frontend implementation is included. Optional-feature configuration, Work Items/
+delivery APIs and all other planned Projects mutations remain separate work.

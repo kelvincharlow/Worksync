@@ -14,7 +14,8 @@ info:
     docs/api-contract.md for the existing password-reset path mismatch.
 
     Modules 2/3 (V13 agreement): project creation, eligible-user lookup and membership GET/POST are merged into main.
-    Project GET list/details and PATCH details are implemented on feature/projects-list-details-update, not yet main; other Projects,
+    Project GET list/details and PATCH details are merged. GET project permissions/me is implemented on
+    feature/projects-effective-permissions, not yet main; other Projects,
     Work Items and Bugs HTTP operations remain planned. See docs/api-contract.md for authority rules and
     explicitly unresolved/proposed choices; x-contract-decision marks proposals.
     Existing Module 1 operations and behavior are unchanged.
@@ -27,7 +28,7 @@ info:
     - Administrator approval/rejection/block/unblock endpoints are implemented.
       Users V7 PROJECT_CREATE grants, V5/V6 foundations and POST /projects are merged.
       Eligible-user lookup and membership GET/POST are merged. Project GET list/details and PATCH details are
-      implemented on feature/projects-list-details-update; other Projects endpoints remain planned.
+      merged through PR #19. Effective permissions is implemented on feature/projects-effective-permissions; other Projects endpoints remain planned.
     - Updated main SecurityConfig allows PENDING_APPROVAL users to GET and PUT
       /users/me. /api/v1/notifications/** requires STATUS_ACTIVE; pending users
       cannot access notifications. Administrator routes require ROLE_ADMIN and
@@ -702,7 +703,7 @@ paths:
         Owner and creator come only from the verified principal. Unknown request fields are rejected.
         Text properties require actual JSON strings; numeric/boolean coercion and explicit null text values are rejected.
         Optional text fields may be omitted; dates may be omitted or null.
-        Temporary initial permissions have role MANAGER, responsibility null, isOwner true and empty actions.
+        Initial permissions have role MANAGER, responsibility null, isOwner true and the six currently implemented Owner actions.
         Optional enabledViews and enabledWorkTypes are empty; Overview/Planning remain mandatory.
         These response-only defaults do not enable work functionality. Configurable-feature policy requires later review.'
       security:
@@ -737,7 +738,7 @@ paths:
       operationId: listMyProjects
       summary: List accessible projects
       x-implementation-status: implemented
-      description: 'Implemented on feature/projects-list-details-update, not yet main. Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+      description: 'Merged through PR #19. Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
         per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
         non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
         returns 403. Authorization: ACTIVE authenticated actor; scope to own current memberships. No-project state
@@ -776,7 +777,7 @@ paths:
       operationId: getProject
       summary: Read project
       x-implementation-status: implemented
-      description: 'Implemented on feature/projects-list-details-update, not yet main. Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+      description: 'Merged through PR #19. Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
         per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
         non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
         returns 403. Authorization: Current project participant (MANAGER, MEMBER, VIEWER); Viewer receives only whitelisted
@@ -813,7 +814,7 @@ paths:
       operationId: updateProject
       summary: Update project details
       x-implementation-status: implemented
-      description: 'Implemented on feature/projects-list-details-update, not yet main. Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
+      description: 'Merged through PR #19. Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
         per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
         non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
         returns 403. Authorization: Owner or additional MANAGER; not ordinary MEMBER/VIEWER. Partial update requires at least one supported field. Text values must be JSON strings; only dates accept null. Unknown/protected fields are rejected. Omitted fields are retained, null dates are cleared, and the resulting complete date range is validated. The writable READ_COMMITTED transaction acquires the existing Users lifecycle lock before the Project row lock and rechecks current ACTIVE state and project authority. Ownership, creator, status and memberships are unchanged. '
@@ -1086,15 +1087,17 @@ paths:
       - Projects
       operationId: getMyProjectPermissions
       summary: Read effective project permissions
-      x-implementation-status: planned
-      description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
-        per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
-        non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
-        returns 403. Authorization: Current project participant (MANAGER, MEMBER, VIEWER); Viewer receives only whitelisted
-        client-safe fields.  Return InternalProjectPermissionsResponse to MANAGER/MEMBER, preserving authorized internal
-        configuration. Return ViewerProjectPermissionsResponse to VIEWER: VIEW_DELIVERY and only available delivery
-        summary/milestone/progress features; never configuration, work-item settings, internal reporting or admin
-        options. Availability never overrides unpublished-by-default publication rules.'
+      x-implementation-status: implemented
+      description: 'Implemented on feature/projects-effective-permissions, not yet main. Requires authenticated current
+        ACTIVE account and current database-backed project membership. Unknown/non-disclosable projects return 404;
+        ADMIN and PROJECT_CREATE alone grant no access. MANAGER/MEMBER receive InternalProjectPermissionsResponse;
+        VIEWER receives only ViewerProjectPermissionsResponse with VIEW_PROJECT and empty availableDeliveryFeatures.
+        Current implemented actions derive from membership, role, Owner designation and archived state. Active Owner
+        receives VIEW_PROJECT, VIEW_PROJECT_TEAM, UPDATE_PROJECT_DETAILS, SELECT_ELIGIBLE_USERS, ADD_PROJECT_MEMBER,
+        ADD_PROJECT_MANAGER. Additional MANAGER lacks ADD_PROJECT_MANAGER. MEMBER responsibilities receive only
+        VIEW_PROJECT and VIEW_PROJECT_TEAM. VIEWER receives only VIEW_PROJECT. Archived projects expose read actions
+        only. Optional enabledViews/enabledWorkTypes remain empty; work/delivery/configuration/demotion/removal/transfer/
+        archive actions are not advertised. Hints never replace operation-specific authorization or publish content.'
       security:
       - BearerAuth: []
       x-authorization: Current project participant (MANAGER, MEMBER, VIEWER); Viewer receives only whitelisted client-safe
@@ -3055,6 +3058,17 @@ components:
       - REPORT_BUG
       - TRIAGE_BUG
       - DESIGNATE_BUG_VERIFIER
+      - VIEW_PROJECT
+      - VIEW_PROJECT_TEAM
+      - UPDATE_PROJECT_DETAILS
+      - SELECT_ELIGIBLE_USERS
+      - ADD_PROJECT_MEMBER
+      - ADD_PROJECT_MANAGER
+      description: >-
+        Effective permissions currently advertise only VIEW_PROJECT, VIEW_PROJECT_TEAM, UPDATE_PROJECT_DETAILS,
+        SELECT_ELIGIBLE_USERS, ADD_PROJECT_MEMBER and ADD_PROJECT_MANAGER, subject to current membership and lifecycle.
+        ADD_PROJECT_MEMBER covers adding MEMBER (with a required primary responsibility) or VIEWER; only Owner may
+        ADD_PROJECT_MANAGER. Other values retain the planned Work Items/delivery contract and are not currently advertised.
     ProjectView:
       type: string
       enum:
@@ -4646,7 +4660,7 @@ components:
           items:
             type: string
             enum:
-            - VIEW_DELIVERY
+            - VIEW_PROJECT
         availableDeliveryFeatures:
           type: array
           uniqueItems: true
@@ -4656,7 +4670,7 @@ components:
             - DELIVERY_SUMMARY
             - MILESTONES
             - DELIVERY_PROGRESS
-          description: Server-derived availability of existing client-facing delivery surfaces only. Describes access/presentation,
+          description: Currently empty because delivery APIs and publication functionality are not implemented. Future server-derived availability of existing client-facing delivery surfaces only. Describes access/presentation,
             not publication approval; unpublished content remains omitted/null under publication rules. Never includes
             LIST/BOARD, work-item types, internal reports or administrative options.
       description: Whitelisted effective permissions for the current ACTIVE Viewer only. No configuration object, work-item

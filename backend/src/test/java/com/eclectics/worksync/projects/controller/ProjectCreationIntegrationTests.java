@@ -88,7 +88,7 @@ class ProjectCreationIntegrationTests {
                 .andExpect(jsonPath("$.permissions.role").value("MANAGER"))
                 .andExpect(jsonPath("$.permissions.isOwner").value(true))
                 .andExpect(jsonPath("$.permissions.responsibility").hasJsonPath())
-                .andExpect(jsonPath("$.permissions.actions").isEmpty())
+                .andExpect(jsonPath("$.permissions.actions").value(org.hamcrest.Matchers.containsInAnyOrder("VIEW_PROJECT","VIEW_PROJECT_TEAM","UPDATE_PROJECT_DETAILS","SELECT_ELIGIBLE_USERS","ADD_PROJECT_MEMBER","ADD_PROJECT_MANAGER")))
                 .andExpect(jsonPath("$.permissions.configuration.enabledViews").isEmpty())
                 .andExpect(jsonPath("$.permissions.configuration.enabledWorkTypes").isEmpty())
                 .andExpect(jsonPath("$.passwordHash").doesNotExist());
@@ -178,7 +178,8 @@ class ProjectCreationIntegrationTests {
         Map<String, Object> permissions = (Map<String, Object>) response.get("permissions");
         assertThat(permissions.keySet()).containsExactlyInAnyOrder("role", "responsibility", "isOwner", "actions", "configuration");
         assertThat(permissions).containsEntry("role", "MANAGER").containsEntry("responsibility", null)
-                .containsEntry("isOwner", true).containsEntry("actions", List.of());
+                .containsEntry("isOwner", true);
+        assertThat((List<String>) permissions.get("actions")).containsExactlyInAnyOrder("VIEW_PROJECT","VIEW_PROJECT_TEAM","UPDATE_PROJECT_DETAILS","SELECT_ELIGIBLE_USERS","ADD_PROJECT_MEMBER","ADD_PROJECT_MANAGER");
         assertThat((Map<String, Object>) permissions.get("configuration"))
                 .containsOnlyKeys("enabledViews", "enabledWorkTypes")
                 .containsEntry("enabledViews", List.of()).containsEntry("enabledWorkTypes", List.of());

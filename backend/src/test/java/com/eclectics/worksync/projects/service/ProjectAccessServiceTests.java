@@ -51,7 +51,10 @@ class ProjectAccessServiceTests {
                 when(members.findByProjectIdAndUserId(projectId, actor)).thenReturn(Optional.of(new ProjectMember(projectId, actor, role, responsibility)));
                 Set<ProjectAction> expected;
                 if (role == ProjectRole.MANAGER || responsibility == ProjectResponsibility.TECHNICAL_LEAD) {
-                    expected = EnumSet.allOf(ProjectAction.class);
+                    expected = EnumSet.of(ProjectAction.VIEW_DELIVERY,ProjectAction.VIEW_INTERNAL_WORK,
+                            ProjectAction.CREATE_EPIC,ProjectAction.CREATE_STORY,ProjectAction.CREATE_TASK,
+                            ProjectAction.UPDATE_ASSIGNED_WORK,ProjectAction.ASSIGN_WORK,ProjectAction.REPORT_BUG,
+                            ProjectAction.TRIAGE_BUG,ProjectAction.DESIGNATE_BUG_VERIFIER);
                 } else if (role == ProjectRole.VIEWER) {
                     expected = Set.of(ProjectAction.VIEW_DELIVERY);
                 } else if (responsibility == ProjectResponsibility.DEVELOPER) {
@@ -60,6 +63,11 @@ class ProjectAccessServiceTests {
                 } else {
                     expected = Set.of(ProjectAction.VIEW_DELIVERY, ProjectAction.VIEW_INTERNAL_WORK, ProjectAction.REPORT_BUG);
                 }
+                expected=EnumSet.copyOf(expected);
+                expected.add(ProjectAction.VIEW_PROJECT);
+                if(role!=ProjectRole.VIEWER) expected.add(ProjectAction.VIEW_PROJECT_TEAM);
+                if(role==ProjectRole.MANAGER) expected.addAll(Set.of(ProjectAction.UPDATE_PROJECT_DETAILS,
+                        ProjectAction.SELECT_ELIGIBLE_USERS,ProjectAction.ADD_PROJECT_MEMBER));
                 boolean allowed = expected.contains(action);
                 if (allowed) assertThatCode(() -> service.requireAction(projectId, actor, action)).doesNotThrowAnyException();
                 else assertThatThrownBy(() -> service.requireAction(projectId, actor, action)).isInstanceOf(ProjectAccessDeniedException.class);
@@ -88,9 +96,18 @@ class ProjectAccessServiceTests {
     void archivedProjectsAllowOnlyReadCapabilities(ProjectAction action) {
         setupMember(ProjectRole.MANAGER, null);
         ReflectionTestUtils.setField(project, "status", ProjectStatus.ARCHIVED);
-        if (action == ProjectAction.VIEW_DELIVERY || action == ProjectAction.VIEW_INTERNAL_WORK)
+        if (action == ProjectAction.VIEW_DELIVERY || action == ProjectAction.VIEW_INTERNAL_WORK
+                || action == ProjectAction.VIEW_PROJECT || action == ProjectAction.VIEW_PROJECT_TEAM)
             assertThatCode(() -> service.requireAction(projectId, actor, action)).doesNotThrowAnyException();
+        else if(action==ProjectAction.ADD_PROJECT_MANAGER)
+            assertThatThrownBy(() -> service.requireAction(projectId, actor, action)).isInstanceOf(ProjectAccessDeniedException.class);
         else assertThatThrownBy(() -> service.requireAction(projectId, actor, action)).isInstanceOf(ProjectArchivedException.class);
+    }
+    @Test void onlyOwnerMayAppointAnotherManager() {
+        setupMember(ProjectRole.MANAGER,null);
+        assertThatThrownBy(() -> service.requireAction(projectId,actor,ProjectAction.ADD_PROJECT_MANAGER)).isInstanceOf(ProjectAccessDeniedException.class);
+        ReflectionTestUtils.setField(project,"ownerUserId",actor);
+        assertThatCode(() -> service.requireAction(projectId,actor,ProjectAction.ADD_PROJECT_MANAGER)).doesNotThrowAnyException();
     }
     @Test void writableGuardRejectsArchivedProject() {
         when(projects.findById(projectId)).thenReturn(Optional.of(project));

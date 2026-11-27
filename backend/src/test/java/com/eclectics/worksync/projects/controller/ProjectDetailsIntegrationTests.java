@@ -98,7 +98,9 @@ class ProjectDetailsIntegrationTests {
             var map=tools.jackson.databind.json.JsonMapper.builder().build().readValue(json,Map.class);
             assertThat(map.keySet()).containsExactlyInAnyOrder("id","name","status","role","responsibility","isOwner");
         } else result.andExpect(jsonPath("$.description").value("Secret brief")).andExpect(jsonPath("$.permissions.role").value(role.name()))
-                .andExpect(jsonPath("$.permissions.isOwner").value(false)).andExpect(jsonPath("$.permissions.actions").isEmpty())
+                .andExpect(jsonPath("$.permissions.isOwner").value(false)).andExpect(jsonPath("$.permissions.actions").value(org.hamcrest.Matchers.containsInAnyOrder(role==ProjectRole.MANAGER
+                        ?new String[]{"VIEW_PROJECT","VIEW_PROJECT_TEAM","UPDATE_PROJECT_DETAILS","SELECT_ELIGIBLE_USERS","ADD_PROJECT_MEMBER"}
+                        :new String[]{"VIEW_PROJECT","VIEW_PROJECT_TEAM"})))
                 .andExpect(jsonPath("$.permissions.configuration.enabledWorkTypes").isEmpty());
     }
     @ParameterizedTest @EnumSource(SystemRole.class)
