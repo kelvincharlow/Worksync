@@ -24,6 +24,7 @@ jobs:
       TEST_DB_URL: jdbc:postgresql://localhost:5432/worksync_test
       TEST_DB_USER: worksync_test
       TEST_DB_PASSWORD: ci-disposable-only
+      JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
