@@ -11,13 +11,14 @@ import org.springframework.transaction.annotation.Transactional;
 @Service @Transactional(readOnly=true)
 public class ProjectPermissionService {
     private final ProjectAccessService access;
-    public ProjectPermissionService(ProjectAccessService access) {this.access=access;}
+    private final com.eclectics.worksync.projects.repository.ProjectRepository projects;
+    public ProjectPermissionService(ProjectAccessService access,com.eclectics.worksync.projects.repository.ProjectRepository projects) {this.access=access;this.projects=projects;}
     public Object get(UUID projectId,UUID actorId) {
         ProjectMemberAccess member;
         try { member=access.getMemberAccess(projectId,actorId); }
         catch(ProjectAccessDeniedException hidden) { throw new ProjectNotFoundException(); }
         // The shared helper loads current ACTIVE state, membership, responsibility, Owner and project status.
         if(member.role()==ProjectRole.VIEWER) return ViewerProjectPermissionsResponse.from(member);
-        return ProjectPermissionsResponse.from(member);
+        return ProjectPermissionsResponse.from(member,ProjectConfigurationResponse.from(projects.findById(projectId).orElseThrow(ProjectNotFoundException::new)));
     }
 }

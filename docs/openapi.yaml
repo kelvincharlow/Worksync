@@ -14,8 +14,7 @@ info:
     docs/api-contract.md for the existing password-reset path mismatch.
 
     Modules 2/3 (V13 agreement): project creation, eligible-user lookup and membership GET/POST are merged into main.
-    Project GET list/details and PATCH details are merged. GET project permissions/me is merged. Ownership transfer is implemented on
-    feature/projects-membership-lifecycle, not yet main; other Projects,
+    Project GET list/details and PATCH details are merged. GET project permissions/me is merged. Ownership transfer is merged through PR #21. Configuration GET/PATCH is implemented on feature/projects-configuration, not yet main; other Projects,
     Work Items and Bugs HTTP operations remain planned. See docs/api-contract.md for authority rules and
     explicitly unresolved/proposed choices; x-contract-decision marks proposals.
     Existing Module 1 operations and behavior are unchanged.
@@ -28,7 +27,7 @@ info:
     - Administrator approval/rejection/block/unblock endpoints are implemented.
       Users V7 PROJECT_CREATE grants, V5/V6 foundations and POST /projects are merged.
       Eligible-user lookup and membership GET/POST are merged. Project GET list/details and PATCH details are
-      merged through PR #19. Effective permissions is merged; ownership transfer is implemented on feature/projects-membership-lifecycle; other Projects endpoints remain planned.
+      merged through PR #19. Effective permissions is merged; ownership transfer is merged through PR #21. Configuration GET/PATCH is implemented on feature/projects-configuration; other Projects endpoints remain planned.
     - Updated main SecurityConfig allows PENDING_APPROVAL users to GET and PUT
       /users/me. /api/v1/notifications/** requires STATUS_ACTIVE; pending users
       cannot access notifications. Administrator routes require ROLE_ADMIN and
@@ -703,8 +702,8 @@ paths:
         Owner and creator come only from the verified principal. Unknown request fields are rejected.
         Text properties require actual JSON strings; numeric/boolean coercion and explicit null text values are rejected.
         Optional text fields may be omitted; dates may be omitted or null.
-        Initial permissions have role MANAGER, responsibility null, isOwner true and the seven currently implemented Owner actions.
-        Optional enabledViews and enabledWorkTypes are empty; Overview/Planning remain mandatory.
+        Initial permissions have role MANAGER, responsibility null, isOwner true and the nine currently implemented Owner actions.
+        V8 persists optional enabledViews and enabledWorkTypes, initially empty; Overview/Planning remain mandatory.
         These response-only defaults do not enable work functionality. Configurable-feature policy requires later review.'
       security:
       - BearerAuth: []
@@ -1048,7 +1047,7 @@ paths:
       operationId: transferProjectOwnership
       summary: Transfer project ownership
       x-implementation-status: implemented
-      description: 'Implemented on feature/projects-membership-lifecycle, not yet main. Current ACTIVE designated Owner
+      description: 'Merged through PR #21. Current ACTIVE designated Owner
         only; ADMIN and PROJECT_CREATE provide no bypass. Target must be different, currently ACTIVE and already a
         MANAGER of this project. Previous and new Owner memberships stay MANAGER and are not otherwise modified.
         Writable READ_COMMITTED transaction acquires Users lifecycle lock, Project row lock and affected membership
@@ -1098,9 +1097,9 @@ paths:
         VIEWER receives only ViewerProjectPermissionsResponse with VIEW_PROJECT and empty availableDeliveryFeatures.
         Current implemented actions derive from membership, role, Owner designation and archived state. Active Owner
         receives VIEW_PROJECT, VIEW_PROJECT_TEAM, UPDATE_PROJECT_DETAILS, SELECT_ELIGIBLE_USERS, ADD_PROJECT_MEMBER,
-        ADD_PROJECT_MANAGER and TRANSFER_PROJECT_OWNERSHIP. Additional MANAGER lacks both Owner-only actions. MEMBER responsibilities receive only
-        VIEW_PROJECT and VIEW_PROJECT_TEAM. VIEWER receives only VIEW_PROJECT. Archived projects expose read actions
-        only. Optional enabledViews/enabledWorkTypes remain empty; work/delivery/configuration/demotion/removal/
+        ADD_PROJECT_MANAGER, TRANSFER_PROJECT_OWNERSHIP, VIEW_PROJECT_CONFIGURATION and UPDATE_PROJECT_CONFIGURATION. Additional MANAGER lacks both Owner-only actions. MEMBER responsibilities receive only
+        VIEW_PROJECT, VIEW_PROJECT_TEAM and VIEW_PROJECT_CONFIGURATION. VIEWER receives only VIEW_PROJECT. Archived projects expose read actions
+        only. Internal configuration comes from V8 persistence; optional features remain unavailable for activation. Work/delivery/demotion/removal/
         archive actions are not advertised. Hints never replace operation-specific authorization or publish content.'
       security:
       - BearerAuth: []
@@ -1131,11 +1130,11 @@ paths:
       - Projects
       operationId: getProjectConfiguration
       summary: Read internal feature configuration
-      x-implementation-status: planned
+      x-implementation-status: implemented
       description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
         per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
         non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
-        returns 403. Authorization: Owner/MANAGER or MEMBER (TECHNICAL_LEAD, DEVELOPER, QA_TESTER); never VIEWER. '
+        returns 403. Authorization: Owner/MANAGER or MEMBER (TECHNICAL_LEAD, DEVELOPER, QA_TESTER); never VIEWER. Persisted V8 settings; archived internal reads remain available. '
       security:
       - BearerAuth: []
       x-authorization: Owner/MANAGER or MEMBER (TECHNICAL_LEAD, DEVELOPER, QA_TESTER); never VIEWER.
@@ -1163,11 +1162,11 @@ paths:
       - Projects
       operationId: updateProjectConfiguration
       summary: Update project-wide configuration
-      x-implementation-status: planned
+      x-implementation-status: implemented
       description: 'Bearer JWT and current ACTIVE account required. Recheck database-backed project membership and
         per-record authority on every call; system ADMIN alone grants no private-project access. All mutations require
         non-archived project. Unknown/cross-project/non-disclosable IDs return 404; authenticated insufficient capability
-        returns 403. Authorization: Owner or additional MANAGER; not ordinary MEMBER/VIEWER. '
+        returns 403. Authorization: Owner or additional MANAGER; not ordinary MEMBER/VIEWER. Writable READ_COMMITTED; Users lifecycle lock precedes Project row lock. Omission preserves a collection; empty arrays clear it. All nonempty selections are currently unavailable and return sanitized 400. '
       security:
       - BearerAuth: []
       x-authorization: Owner or additional MANAGER; not ordinary MEMBER/VIEWER.
@@ -3069,9 +3068,12 @@ components:
       - ADD_PROJECT_MEMBER
       - ADD_PROJECT_MANAGER
       - TRANSFER_PROJECT_OWNERSHIP
+      - VIEW_PROJECT_CONFIGURATION
+      - UPDATE_PROJECT_CONFIGURATION
       description: >-
         Effective permissions currently advertise only VIEW_PROJECT, VIEW_PROJECT_TEAM, UPDATE_PROJECT_DETAILS,
-        SELECT_ELIGIBLE_USERS, ADD_PROJECT_MEMBER, ADD_PROJECT_MANAGER and TRANSFER_PROJECT_OWNERSHIP, subject to current membership and lifecycle.
+        SELECT_ELIGIBLE_USERS, ADD_PROJECT_MEMBER, ADD_PROJECT_MANAGER, TRANSFER_PROJECT_OWNERSHIP,
+        VIEW_PROJECT_CONFIGURATION and UPDATE_PROJECT_CONFIGURATION, subject to current membership and lifecycle. VIEW_PROJECT_CONFIGURATION is internal-participant-only; UPDATE_PROJECT_CONFIGURATION is Manager-only. Archived projects retain configuration reads only.
         ADD_PROJECT_MEMBER covers adding MEMBER (with a required primary responsibility) or VIEWER; only Owner may
         ADD_PROJECT_MANAGER or TRANSFER_PROJECT_OWNERSHIP. Other values retain the planned Work Items/delivery contract and are not currently advertised.
     ProjectView:
@@ -3316,7 +3318,7 @@ components:
       - enabledViews
       - enabledWorkTypes
       description: Overview/Planning are mandatory. Calendar/Gantt, custom workflows and advanced modules are deferred.
-        Disabling optional views/types never deletes existing work or grants edit rights.
+        Disabling optional views/types never deletes existing work or grants edit rights. V8 persists settings with empty defaults. LIST/BOARD and EPIC/STORY/TASK/BUG activation is currently unavailable; every nonempty selection returns safe 400 until frontend readiness and Work Items enforcement are agreed. Nulls, duplicates, incorrect JSON types and unknown fields are rejected.
     UpdateProjectConfigurationRequest:
       type: object
       additionalProperties: false
@@ -3335,7 +3337,7 @@ components:
             $ref: '#/components/schemas/WorkItemType'
           uniqueItems: true
       description: Overview/Planning are mandatory. Calendar/Gantt, custom workflows and advanced modules are deferred.
-        Disabling optional views/types never deletes existing work or grants edit rights.
+        Disabling optional views/types never deletes existing work or grants edit rights. V8 persists settings with empty defaults. LIST/BOARD and EPIC/STORY/TASK/BUG activation is currently unavailable; every nonempty selection returns safe 400 until frontend readiness and Work Items enforcement are agreed. Nulls, duplicates, incorrect JSON types and unknown fields are rejected.
       minProperties: 1
     EffectiveProjectPermissionsResponse:
       oneOf:

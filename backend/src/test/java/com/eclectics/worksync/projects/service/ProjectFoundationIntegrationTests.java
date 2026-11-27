@@ -64,7 +64,8 @@ class ProjectFoundationIntegrationTests {
         assertThat(projects.findById(p.getId())).get().extracting(Project::getOwnerUserId).isEqualTo(owner);
         assertThat(access.getMemberAccess(p.getId(),owner).isOwner()).isTrue();
         assertThat(p.getCreatedAt()).isNotNull();
-        assertThat(ProjectResponse.from(p, ProjectPermissionsResponse.initialOwner()).ownerUserId()).isEqualTo(owner);
+        UUID responseOwner = tx().execute(t -> { var loaded=projects.findById(p.getId()).orElseThrow(); return ProjectResponse.from(loaded,ProjectPermissionsResponse.initialOwner(loaded)).ownerUserId(); });
+        assertThat(responseOwner).isEqualTo(owner);
         assertThat(ProjectMemberResponse.from(members.findByProjectIdAndUserId(p.getId(),owner).orElseThrow(), "Test User", owner).role()).isEqualTo(ProjectRole.MANAGER);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE version='5' AND success",Integer.class)).isEqualTo(1);
     }

@@ -50,6 +50,6 @@ public class ProjectOwnershipService {
         project.transferOwnership(targetId);
         var saved=projects.saveAndFlush(project);
         // The response belongs to the acting previous Owner, now an additional MANAGER.
-        return ProjectResponse.from(saved,ProjectPermissionsResponse.from(access.getMemberAccess(projectId,actorId)));
+        return ProjectResponse.from(saved,ProjectPermissionsResponse.from(access.getMemberAccess(projectId,actorId),ProjectConfigurationResponse.from(saved)));
     }
 }

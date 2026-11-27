@@ -73,9 +73,9 @@ class ProjectPermissionIntegrationTests {
         Map<String,Object> result=tools.jackson.databind.json.JsonMapper.builder().build().readValue(body,Map.class);
         assertThat(result.get("responsibility")).isEqualTo(responsibility==null?null:responsibility.name());
         Set<String> expected=new HashSet<>(Set.of("VIEW_PROJECT"));
-        if(role!=ProjectRole.VIEWER)expected.add("VIEW_PROJECT_TEAM");
+        if(role!=ProjectRole.VIEWER)expected.addAll(Set.of("VIEW_PROJECT_TEAM","VIEW_PROJECT_CONFIGURATION"));
         if(status==ProjectStatus.ACTIVE && role==ProjectRole.MANAGER) {
-            expected.addAll(Set.of("UPDATE_PROJECT_DETAILS","SELECT_ELIGIBLE_USERS","ADD_PROJECT_MEMBER"));
+            expected.addAll(Set.of("UPDATE_PROJECT_DETAILS","SELECT_ELIGIBLE_USERS","ADD_PROJECT_MEMBER","UPDATE_PROJECT_CONFIGURATION"));
             if(isOwner)expected.addAll(Set.of("ADD_PROJECT_MANAGER","TRANSFER_PROJECT_OWNERSHIP"));
         }
         assertThat((List<String>)result.get("actions")).containsExactlyInAnyOrderElementsOf(expected).doesNotHaveDuplicates();

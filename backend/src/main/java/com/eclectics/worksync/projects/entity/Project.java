@@ -5,6 +5,8 @@ import jakarta.validation.constraints.*;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Objects;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.UUID;
 
 /** Projects persistence only. User references are UUIDs, never cross-domain JPA entities. */
@@ -32,6 +34,22 @@ public class Project {
     @Column(name = "created_at", nullable = false, updatable = false) private Instant createdAt;
     @Column(name = "updated_at", nullable = false) private Instant updatedAt;
 
+    @ElementCollection @CollectionTable(name="project_enabled_views", joinColumns=@JoinColumn(name="project_id"))
+    @Enumerated(EnumType.STRING) @Column(name="view", nullable=false, length=16)
+    private Set<ProjectOptionalView> enabledViews = new HashSet<>();
+    @ElementCollection @CollectionTable(name="project_enabled_work_types", joinColumns=@JoinColumn(name="project_id"))
+    @Enumerated(EnumType.STRING) @Column(name="work_type", nullable=false, length=16)
+    private Set<ProjectWorkType> enabledWorkTypes = new HashSet<>();
+
+    public Set<ProjectOptionalView> getEnabledViews() { return Set.copyOf(enabledViews); }
+    public Set<ProjectWorkType> getEnabledWorkTypes() { return Set.copyOf(enabledWorkTypes); }
+    /** Optional capabilities are unavailable until frontend/Work Items enforcement is agreed. */
+    public void updateConfiguration(Set<ProjectOptionalView> views, Set<ProjectWorkType> types) {
+        if ((views != null && !views.isEmpty()) || (types != null && !types.isEmpty()))
+            throw new IllegalArgumentException("Unavailable project feature");
+        if (views != null) { enabledViews.clear(); enabledViews.addAll(views); }
+        if (types != null) { enabledWorkTypes.clear(); enabledWorkTypes.addAll(types); }
+    }
     protected Project() { }
 
     /** Only the authorized creation transaction may pair this with its initial MANAGER membership. */

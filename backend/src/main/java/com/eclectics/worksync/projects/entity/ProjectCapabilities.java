@@ -12,14 +12,14 @@ public final class ProjectCapabilities {
         Objects.requireNonNull(role);
         return switch(action) {
             case VIEW_PROJECT -> true;
-            case VIEW_PROJECT_TEAM -> role!=ProjectRole.VIEWER;
-            case UPDATE_PROJECT_DETAILS,SELECT_ELIGIBLE_USERS,ADD_PROJECT_MEMBER -> role==ProjectRole.MANAGER;
+            case VIEW_PROJECT_TEAM,VIEW_PROJECT_CONFIGURATION -> role!=ProjectRole.VIEWER;
+            case UPDATE_PROJECT_DETAILS,SELECT_ELIGIBLE_USERS,ADD_PROJECT_MEMBER,UPDATE_PROJECT_CONFIGURATION -> role==ProjectRole.MANAGER;
             case ADD_PROJECT_MANAGER,TRANSFER_PROJECT_OWNERSHIP -> role==ProjectRole.MANAGER && isOwner;
             default -> false; // Planned Work Items/delivery operations are never advertised here.
         };
     }
     public static boolean isRead(ProjectAction action) {
-        return action==ProjectAction.VIEW_PROJECT || action==ProjectAction.VIEW_PROJECT_TEAM;
+        return action==ProjectAction.VIEW_PROJECT || action==ProjectAction.VIEW_PROJECT_TEAM || action==ProjectAction.VIEW_PROJECT_CONFIGURATION;
     }
     public static Set<ProjectAction> availableActions(ProjectRole role,boolean isOwner,ProjectStatus status) {
         Objects.requireNonNull(status);

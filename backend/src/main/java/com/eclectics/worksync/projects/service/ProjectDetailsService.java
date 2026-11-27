@@ -34,7 +34,7 @@ public class ProjectDetailsService {
         var member=participant(projectId,actor);
         var project=projects.findById(projectId).orElseThrow(ProjectNotFoundException::new);
         if(member.role()==ProjectRole.VIEWER) return ProjectSummaryResponse.from(project,member);
-        return ProjectResponse.from(project,ProjectPermissionsResponse.from(member));
+        return ProjectResponse.from(project,ProjectPermissionsResponse.from(member,ProjectConfigurationResponse.from(project)));
     }
     @Transactional(isolation=Isolation.READ_COMMITTED)
     public ProjectResponse update(UUID projectId,UUID actor,UpdateProjectRequest request) {
@@ -57,7 +57,7 @@ public class ProjectDetailsService {
                 request.has(Field.SUCCESS_CRITERIA)?request.successCriteria():project.getSuccessCriteria(),
                 request.has(Field.START_DATE)?request.startDate():project.getStartDate(),
                 request.has(Field.DUE_DATE)?request.dueDate():project.getDueDate());
-        return ProjectResponse.from(projects.saveAndFlush(project),ProjectPermissionsResponse.from(member));
+        return ProjectResponse.from(projects.saveAndFlush(project),ProjectPermissionsResponse.from(member,ProjectConfigurationResponse.from(project)));
     }
     private ProjectMemberAccess participant(UUID projectId,UUID actor) {
         try { return access.getMemberAccess(projectId,actor); }

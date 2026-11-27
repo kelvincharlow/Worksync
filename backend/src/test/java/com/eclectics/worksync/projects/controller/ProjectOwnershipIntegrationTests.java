@@ -124,7 +124,7 @@ class ProjectOwnershipIntegrationTests {
         mvc.perform(post(path()).header("Authorization",token(owner)).contentType("application/json").content(body(target.id())))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PROJECT_ARCHIVED"));
         mvc.perform(get("/api/v1/projects/"+project+"/permissions/me").header("Authorization",token(owner))).andExpect(status().isOk())
-                .andExpect(jsonPath("$.actions").value(org.hamcrest.Matchers.containsInAnyOrder("VIEW_PROJECT","VIEW_PROJECT_TEAM")));
+                .andExpect(jsonPath("$.actions").value(org.hamcrest.Matchers.containsInAnyOrder("VIEW_PROJECT","VIEW_PROJECT_TEAM","VIEW_PROJECT_CONFIGURATION")));
         assertThat(currentOwner()).isEqualTo(owner.id());
     }
     @ParameterizedTest @ValueSource(strings={"{}","{\"newOwnerUserId\":null}","{\"newOwnerUserId\":\"invalid-uuid\"}","{\"newOwnerUserId\":123}","{\"newOwnerUserId\":false}","{\"newOwnerUserId\":[]}","{\"newOwnerUserId\":{}}","{\"ownerUserId\":\"00000000-0000-0000-0000-000000000001\"}"})
