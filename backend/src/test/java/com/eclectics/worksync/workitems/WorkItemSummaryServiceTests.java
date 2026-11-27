@@ -43,6 +43,7 @@ class WorkItemSummaryServiceTests {
                 "Story 1", "Desc", WorkItemPriority.HIGH,
                 creatorId, null, null
         );
+        item1.changeStatus(WorkItemStatus.IN_PROGRESS);
         item1.changeStatus(WorkItemStatus.DONE);
 
         // Bug in ASSIGNED status (maps to in-progress delivery bucket)
@@ -51,6 +52,7 @@ class WorkItemSummaryServiceTests {
                 "Bug 1", "Desc", WorkItemPriority.MEDIUM,
                 creatorId, null, null
         );
+        item2.changeStatus(WorkItemStatus.TRIAGE);
         item2.changeStatus(WorkItemStatus.ASSIGNED);
 
         when(workItemRepository.findAllByProjectId(projectId))
@@ -80,6 +82,7 @@ class WorkItemSummaryServiceTests {
                 "Payment Gateway", null, null,
                 creatorId, null, null
         );
+        story.changeStatus(WorkItemStatus.IN_PROGRESS);
         story.changeStatus(WorkItemStatus.DONE);
 
         // 2. Standalone Task (IN_PROGRESS) -> counts
@@ -96,6 +99,7 @@ class WorkItemSummaryServiceTests {
                 "Integrate Stripe SDK", null, null,
                 creatorId, null, parentStoryId
         );
+        subtask.changeStatus(WorkItemStatus.IN_PROGRESS);
         subtask.changeStatus(WorkItemStatus.DONE);
 
         // 4. Internal Bug (REPORTED) -> excluded from client progress

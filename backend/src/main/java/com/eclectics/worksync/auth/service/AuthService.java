@@ -25,7 +25,12 @@ import com.eclectics.worksync.auth.dto.RefreshTokenRequest;
 import com.eclectics.worksync.auth.service.RefreshTokenService.RotatedToken;
 import io.jsonwebtoken.Claims;
 import java.util.UUID;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 @Service
 public class AuthService {
 
@@ -38,20 +43,24 @@ public class AuthService {
     private final EmailNotificationService emailNotificationService;
      private final RefreshTokenService refreshTokenService;
        private final TokenBlocklistService tokenBlocklistService;
+    private final TransactionTemplate nonTransactionalTemplate;
     public AuthService(UserService userService,
                        PasswordEncoder passwordEncoder,
                        JwtService jwtService,
                        PasswordResetTokenService passwordResetTokenService,
                        EmailNotificationService emailNotificationService,
                        RefreshTokenService refreshTokenService,
-                    TokenBlocklistService tokenBlocklistService) {
+                    TokenBlocklistService tokenBlocklistService,
+                       PlatformTransactionManager transactionManager) {
         this.userService = userService;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.passwordResetTokenService = passwordResetTokenService;
         this.emailNotificationService = emailNotificationService;
          this.refreshTokenService = refreshTokenService;
-         this.tokenBlocklistService = tokenBlocklistService; 
+         this.tokenBlocklistService = tokenBlocklistService;
+        this.nonTransactionalTemplate = new TransactionTemplate(transactionManager);
+        this.nonTransactionalTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_NOT_SUPPORTED);
     }
 
     /**
@@ -214,12 +223,28 @@ public class AuthService {
             log.warn("Could not revoke refresh tokens on password reset: {}", ex.getMessage());
         }
 
-        // 5. Best-effort confirmation email: failure does not rollback password update
-        try {
-            emailNotificationService.sendPasswordChangedConfirmation(req.email());
-        } catch (Exception ex) {
-            log.warn("Failed to send password-change confirmation email: {}", ex.getMessage());
+        // 5. Best-effort confirmation email after commit and outside any transaction
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCompletion(int status) {
+                    if (status == TransactionSynchronization.STATUS_COMMITTED) {
+                        nonTransactionalTemplate.executeWithoutResult(txStatus -> sendConfirmationSafely(req.email()));
+                    }
+                }
+            });
+        } else {
+            nonTransactionalTemplate.executeWithoutResult(txStatus -> sendConfirmationSafely(req.email()));
         }
 
         return new MessageResponse("Password has been successfully reset. You can now log in with your new password.");
-    }}
+    }
+
+    private void sendConfirmationSafely(String email) {
+        try {
+            emailNotificationService.sendPasswordChangedConfirmation(email);
+        } catch (Exception ex) {
+            log.warn("Failed to send password-change confirmation email: {}", ex.getMessage());
+        }
+    }
+}

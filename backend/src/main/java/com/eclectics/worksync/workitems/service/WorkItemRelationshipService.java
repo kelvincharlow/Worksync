@@ -25,7 +25,7 @@ public class WorkItemRelationshipService {
     }
 
     /**
-     * Validates parent-child compatibility, nesting depth, same-project rules, and cycle safety.
+     * Validates parent-child compatibility, nesting depth, subtree reparenting, and cycles.
      */
     public void validateParentRelationship(
             UUID projectId, 
@@ -53,12 +53,16 @@ public class WorkItemRelationshipService {
                 .orElseThrow(() -> new WorkItemNotFoundException(
                         "Parent work item not found in project: " + parentId));
 
-        // Validate type hierarchy
+        // Validate type hierarchy (EPIC -> STORY -> TASK)
         validateTypeHierarchy(childType, parent.getType());
 
-        // Enforce maximum 1 subtask level: TASK -> TASK -> (no further task nesting)
+        // Enforce maximum 1 subtask level (TASK -> TASK)
         if (childType == WorkItemType.TASK && parent.getType() == WorkItemType.TASK) {
-            validateSubtaskNestingDepth(projectId, parent);
+            // Rule A: The parent task cannot already be a subtask
+            validateParentNotAlreadySubtask(projectId, parent);
+
+            // Rule B: The child cannot already have subtasks of its own!
+            validateChildDoesNotHaveExistingSubtasks(projectId, childId);
         }
 
         // Prevent indirect circular ancestor loops (A -> B -> A)
@@ -108,14 +112,14 @@ public class WorkItemRelationshipService {
                 }
             }
             case BUG -> {
-                // Bugs can optionally attach to Epic, Story, Task, or be standalone
+                // Bugs can attach to Epic, Story, Task, or be standalone
             }
             case EPIC -> throw new InvalidWorkItemRelationshipException(
                     "An EPIC cannot have a parent");
         }
     }
 
-    private void validateSubtaskNestingDepth(UUID projectId, WorkItem parentTask) {
+    private void validateParentNotAlreadySubtask(UUID projectId, WorkItem parentTask) {
         if (parentTask.getParentId() != null) {
             Optional<WorkItem> grandParent = workItemRepository.findByIdAndProjectId(
                     parentTask.getParentId(), projectId);
@@ -124,6 +128,13 @@ public class WorkItemRelationshipService {
                 throw new InvalidWorkItemRelationshipException(
                         "Subtasks cannot be nested more than one level deep");
             }
+        }
+    }
+
+    private void validateChildDoesNotHaveExistingSubtasks(UUID projectId, UUID childId) {
+        if (childId != null && workItemRepository.existsByProjectIdAndParentId(projectId, childId)) {
+            throw new InvalidWorkItemRelationshipException(
+                    "Cannot make task a subtask because it already has child subtasks");
         }
     }
 
@@ -141,7 +152,8 @@ public class WorkItemRelationshipService {
                         "Cycle detected among ancestors of: " + parentId);
             }
 
-            Optional<WorkItem> ancestor = workItemRepository.findByIdAndProjectId(current, projectId);
+            Optional<WorkItem> ancestor = workItemRepository.findByIdAndProjectId(
+                    current, projectId);
             if (ancestor.isEmpty()) {
                 break;
             }
