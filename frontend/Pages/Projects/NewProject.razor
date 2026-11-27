@@ -1,0 +1,177 @@
+
+@page "/projects/new"
+@attribute [Authorize(Policy = "CanCreateProject")]
+
+<PageTitle>New Project · Worksync</PageTitle>
+
+<div class="wizard-page">
+
+    <div class="wizard-header">
+        <div>
+            <p class="eyebrow">New Project</p>
+            <h1 class="wizard-title">Create a project</h1>
+            <p class="wizard-subtitle">
+                A focused setup that adapts to how your team works.
+            </p>
+        </div>
+
+        <button type="button"
+                class="btn btn-secondary"
+                @onclick="HandleSaveDraft">
+            Save draft
+        </button>
+    </div>
+
+    <div class="stepper-card">
+        <ol class="stepper">
+
+            @foreach (var step in Steps)
+            {
+                var state = step.Number == CurrentStep
+                    ? "active"
+                    : step.Number < CurrentStep
+                        ? "done"
+                        : "upcoming";
+
+                <li class="stepper-item @state">
+
+                    <span class="stepper-circle">
+                        @step.Number
+                    </span>
+
+                    <span class="stepper-label">
+                        @step.Label
+                    </span>
+
+                    @if (step.Number != TotalSteps)
+                    {
+                        <span class="stepper-line"></span>
+                    }
+
+                </li>
+            }
+
+        </ol>
+    </div>
+
+    <div class="form-card">
+
+        <p class="eyebrow">
+            STEP @CurrentStep OF @TotalSteps
+        </p>
+
+        <h2 class="form-title">
+            Give your project a home
+        </h2>
+
+        <p class="form-subtitle">
+            Start with the essentials. You can update details and invite more people later.
+        </p>
+
+        <div class="field">
+
+            <label for="projectName">
+                Project name <span class="required">*</span>
+            </label>
+
+            <input id="projectName"
+                   type="text"
+                   maxlength="100"
+                   placeholder="e.g. HR Management System"
+                   class="@(NameError is not null ? "input invalid" : "input")"
+                   @bind="ProjectName"
+                   @bind:event="oninput" />
+
+            @if (NameError is not null)
+            {
+                <span class="field-error">@NameError</span>
+            }
+
+        </div>
+
+        <div class="field">
+
+            <label for="projectGoal">
+                What are you trying to achieve?
+                <span class="required">*</span>
+            </label>
+
+            <textarea id="projectGoal"
+                      rows="3"
+                      maxlength="1000"
+                      placeholder="Briefly describe the goal of this project"
+                      class="@(GoalError is not null ? "input invalid" : "input")"
+                      @bind="ProjectGoal"
+                      @bind:event="oninput"></textarea>
+
+            @if (GoalError is not null)
+            {
+                <span class="field-error">@GoalError</span>
+            }
+
+        </div>
+
+        <div class="field-row">
+
+            <div class="field">
+
+                <label for="startDate">
+                    Start date (optional)
+                </label>
+
+                <input id="startDate"
+                       type="date"
+                       class="input"
+                       @bind="StartDate" />
+
+            </div>
+
+            <div class="field">
+
+                <label for="targetDate">
+                    Target date (optional)
+                </label>
+
+                <input id="targetDate"
+                       type="date"
+                       class="input"
+                       min="@StartDate?.ToString("yyyy-MM-dd")"
+                       @bind="TargetDate" />
+
+                @if (DateError is not null)
+                {
+                    <span class="field-error">@DateError</span>
+                }
+
+            </div>
+
+        </div>
+
+        <div class="info-banner">
+            Private by default. You are automatically the first Project Manager.
+        </div>
+
+        <div class="form-footer">
+
+            <button type="button"
+                    class="btn btn-link"
+                    @onclick="HandleCancel">
+                Cancel
+            </button>
+
+            <span class="step-counter">
+                @CurrentStep / @TotalSteps
+            </span>
+
+            <button type="button"
+                    class="btn btn-primary"
+                    @onclick="HandleContinue">
+                Continue
+                <span class="arrow">&rarr;</span>
+            </button>
+
+        </div>
+
+    </div>
+
+</div>

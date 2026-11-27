@@ -1,81 +1,369 @@
 @namespace Worksync.Frontend.Components.Layout
+@using Worksync.Frontend.Extensions
+@using Worksync.Frontend.Models.Projects
+@using Worksync.Frontend.Models.WorkItems
+@using Worksync.Frontend.Services.Projects
 @inherits LayoutComponentBase
 @implements IDisposable
 
-@inject AuthState Auth
-@inject NavigationManager Navigation
-@inject IDialogService DialogService
+
+
 
 <MudLayout>
-    <AuthorizeView>
+   <AuthorizeView>
         <Authorized>
             <MudDrawer @bind-Open="_drawerOpen"
-                       Width="256px"
+                       Width="260px"
                        ClipMode="DrawerClipMode.Never"
                        Variant="DrawerVariant.Responsive"
                        Elevation="0"
                        Class="ws-sidebar">
-
                 <div class="ws-sidebar-inner">
                     <div class="ws-logo-area">
-                        <a href="/dashboard" class="d-flex align-center">
-                            <img src="/images/2 logo.png" alt="WorkSync" class="ws-sidebar-logo" />
-                        </a>
+                        <span class="ws-logo-icon" aria-hidden="true">
+                            <MudIcon Icon="@Icons.Material.Rounded.GridView" Size="Size.Small" />
+                        </span>
+                        <div>
+                            <div class="ws-logo-name"></div>
+                            @* <div class="ws-logo-mini">ECLECTICS INTERNATIONAL</div> *@
+                        </div>
                     </div>
 
                     <div class="ws-side-scroll">
-                        <div class="ws-nav-label">Workspace</div>
-                        @if (Auth.IsActiveUser)
-                        {
-                            <NavLink href="/dashboard" Match="NavLinkMatch.All" class="ws-nav-link">
-                                <MudIcon Icon="@Icons.Material.Outlined.Home" Size="Size.Small" />
-                                <span>Overview</span>
-                            </NavLink>
-                        }
-                        else
-                        {
-                            <NavLink href="/pending-approval" Match="NavLinkMatch.All" class="ws-nav-link">
-                                <MudIcon Icon="@Icons.Material.Outlined.HourglassEmpty" Size="Size.Small" />
-                                <span>Overview</span>
-                            </NavLink>
-                        }
+                        @if (!Auth.IsActiveUser)
+                            {
+                                <div class="ws-nav-label">Workspace</div>
+                                <NavLink href="/pending-approval" Match="NavLinkMatch.All" class="ws-nav-link">
+                                    <MudIcon Icon="@Icons.Material.Outlined.HourglassEmpty" Size="Size.Small" />
+                                    <span>Approval Status</span>
+                                </NavLink>
+                                <NavLink href="/pending-approval" Match="NavLinkMatch.All" class="ws-nav-link">
+                                    <MudIcon Icon="@Icons.Material.Outlined.HourglassEmpty" Size="Size.Small" />
+                                    <span>Approval Status</span>
+                                </NavLink>
+                            }
+                            else if (Auth.IsActiveAdmin)
+                            {
+                                <div class="ws-nav-label">Administration</div>
 
-                        @if (Auth.IsActiveAdmin)
-                        {
-                            <div class="ws-nav-label">Administration</div>
-                            <NavLink href="/admin/approvals" Match="NavLinkMatch.Prefix" class="ws-nav-link">
-                                <MudIcon Icon="@Icons.Material.Outlined.HowToReg" Size="Size.Small" />
-                                <span>Approvals</span>
-                            </NavLink>
-                            <NavLink href="/admin/users" Match="NavLinkMatch.Prefix" class="ws-nav-link">
-                                <MudIcon Icon="@Icons.Material.Outlined.Group" Size="Size.Small" />
-                                <span>User Management</span>
-                            </NavLink>
+                                <NavLink href="/dashboard" Match="NavLinkMatch.All" class="ws-nav-link">
+                                    <MudIcon Icon="@Icons.Material.Outlined.Dashboard" Size="Size.Small" />
+                                    <span>Overview</span>
+                                </NavLink>
+
+                                <NavLink href="/admin/approvals" Match="NavLinkMatch.Prefix" class="ws-nav-link">
+                                    <MudIcon Icon="@Icons.Material.Outlined.HowToReg" Size="Size.Small" />
+                                    <span>Approvals</span>
+                                </NavLink>
+
+                                <NavLink href="/admin/users" Match="NavLinkMatch.Prefix" class="ws-nav-link">
+                                    <MudIcon Icon="@Icons.Material.Outlined.Group" Size="Size.Small" />
+                                    <span>User Management</span>
+                                </NavLink>
+                            }
+                            else
+                            {
+                                @if (ProjectContext.CanCreateProjects)
+{
+                                    <NavLink href="/home" Match="NavLinkMatch.All" class="ws-nav-link">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Home" Size="Size.Small" />
+                                        <span>Home</span>
+                                    </NavLink>
+
+                                    <NavLink href="/projects" Match="NavLinkMatch.All" class="ws-nav-link">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Folder" Size="Size.Small" />
+                                        <span>My Projects</span>
+                                    </NavLink>
+                                    }
+                            @if (ProjectContext.CanCreateProjects)
+                            {
+                                <NavLink href="/projects/new" class="ws-create-btn">
+                                    <MudIcon Icon="@Icons.Material.Rounded.Add" Size="Size.Small" />
+                                    <span>New project</span>
+                                </NavLink>
+                            }
+
+                            @if (ProjectContext.HasActiveProject && ProjectContext.ActiveProject is not null)
+                            {
+                                var project = ProjectContext.ActiveProject;
+                                var projectId = project.Id;
+                                var config = ProjectContext.ActiveConfiguration;
+                                var role = ProjectContext.WorkspaceRole;
+                                var hasViews = config is not null && (config.ListViewEnabled || config.BoardViewEnabled);
+
+                                <div class="ws-project-box">
+                                    <span class="ws-project-box-label">Open Project</span>
+                                    <div class="ws-project-switch-row">
+                                        <span class="ws-project-icon">@ProjectMonogram(project.Name)</span>
+                                        <select class="ws-project-select"
+                                                aria-label="Switch accessible project"
+                                                value="@projectId"
+                                                @onchange="OnProjectChangedAsync">
+                                            @foreach (var item in ProjectContext.AccessibleProjects)
+                                            {
+                                                <option value="@item.Id">@item.Name</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <span class="ws-project-role-note">
+                                        @WorkspaceRoleLabel · @ProjectContext.AccessibleProjects.Count accessible project@(ProjectContext.AccessibleProjects.Count == 1 ? "" : "s")
+                                    </span>
+                                </div>
+
+                                @if (role is EffectiveWorkspaceRole.Owner or EffectiveWorkspaceRole.Manager)
+                                {
+                                    <div class="ws-nav-label">Project Workspace</div>
+                                    <NavLink href="@($"/projects/{projectId}/overview")" Match="NavLinkMatch.All" class="ws-nav-link">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Dashboard" Size="Size.Small" />
+                                        <span>Overview</span>
+                                    </NavLink>
+                                    <NavLink href="@($"/projects/{projectId}/planning")" Match="NavLinkMatch.Prefix" class="ws-nav-link">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Layers" Size="Size.Small" />
+                                        <span>Planning</span>
+                                    </NavLink>
+
+                                    @if (hasViews)
+                                    {
+                                        <div class="ws-nav-label">Work Views</div>
+                                        <button type="button" class="ws-nav-link" @onclick="() => _viewsExpanded = !_viewsExpanded">
+                                            <MudIcon Icon="@Icons.Material.Outlined.ViewColumn" Size="Size.Small" />
+                                            <span>Views</span>
+                                            <MudIcon Icon="@(_viewsExpanded ? Icons.Material.Rounded.ExpandMore : Icons.Material.Rounded.ChevronRight)"
+                                                     Size="Size.Small"
+                                                     Class="ws-nav-toggle-chevron" />
+                                        </button>
+                                        @if (_viewsExpanded)
+                                        {
+                                            @if (config!.ListViewEnabled)
+                                            {
+                                                <NavLink href="@($"/projects/{projectId}/list")" class="ws-nav-link ws-nav-child">
+                                                    <span>List view</span>
+                                                </NavLink>
+                                            }
+                                            @if (config.BoardViewEnabled)
+                                            {
+                                                <NavLink href="@($"/projects/{projectId}/board")" class="ws-nav-link ws-nav-child">
+                                                    <span>Board view</span>
+                                                </NavLink>
+                                            }
+                                        }
+                                    }
+
+                                    <div class="ws-nav-label">Delivery &amp; People</div>
+                                    <NavLink href="@($"/projects/{projectId}/team")" class="ws-nav-link">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Group" Size="Size.Small" />
+                                        <span>Team &amp; Access</span>
+                                    </NavLink>
+                                    @if (config?.ReportsEnabled == true)
+                                    {
+                                        <NavLink href="@($"/projects/{projectId}/reports")" class="ws-nav-link">
+                                            <MudIcon Icon="@Icons.Material.Outlined.BarChart" Size="Size.Small" />
+                                            <span>Reports</span>
+                                        </NavLink>
+                                    }
+
+                                    <div class="ws-nav-label">Project Management</div>
+                                    <NavLink href="@($"/projects/{projectId}/configuration")" class="ws-nav-link">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Tune" Size="Size.Small" />
+                                        <span>Workflow Configuration</span>
+                                    </NavLink>
+                                    <NavLink href="@($"/projects/{projectId}/settings")" class="ws-nav-link">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Settings" Size="Size.Small" />
+                                        <span>Project Settings</span>
+                                    </NavLink>
+
+                                    <div class="ws-nav-label">Advanced Capabilities</div>
+                                    <NavLink href="@($"/projects/{projectId}/capabilities/workflow")" class="ws-nav-link">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Layers" Size="Size.Small" />
+                                        <span>Advanced Workflows · future</span>
+                                    </NavLink>
+                                    <NavLink href="@($"/projects/{projectId}/capabilities/customize")" class="ws-nav-link">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Tune" Size="Size.Small" />
+                                        <span>Customization · future</span>
+                                    </NavLink>
+                                    <NavLink href="@($"/projects/{projectId}/capabilities/integrations")" class="ws-nav-link">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Description" Size="Size.Small" />
+                                        <span>Integrations · future</span>
+                                    </NavLink>
+                                    <NavLink href="@($"/projects/{projectId}/capabilities/automation")" class="ws-nav-link">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Schedule" Size="Size.Small" />
+                                        <span>Automation · future</span>
+                                    </NavLink>
+                                }
+                                else if (role == EffectiveWorkspaceRole.TechnicalLead)
+                                {
+                                    <div class="ws-nav-label">Technical Lead</div>
+                                    <NavLink href="@($"/projects/{projectId}/overview")" Match="NavLinkMatch.All" class="ws-nav-link">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Dashboard" Size="Size.Small" />
+                                        <span>Technical Overview</span>
+                                    </NavLink>
+                                    <NavLink href="@($"/projects/{projectId}/workload")" class="ws-nav-link">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Group" Size="Size.Small" />
+                                        <span>Team Workload</span>
+                                    </NavLink>
+                                    <NavLink href="@($"/projects/{projectId}/triage")" class="ws-nav-link">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Flag" Size="Size.Small" />
+                                        <span>Bug Triage</span>
+                                    </NavLink>
+                                    <NavLink href="@($"/projects/{projectId}/my-work")" class="ws-nav-link">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Assignment" Size="Size.Small" />
+                                        <span>My Assignments</span>
+                                    </NavLink>
+
+                                    <div class="ws-nav-label">Project Planning</div>
+                                    <NavLink href="@($"/projects/{projectId}/planning")" class="ws-nav-link">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Layers" Size="Size.Small" />
+                                        <span>Plan &amp; Create Work</span>
+                                    </NavLink>
+                                }
+                                else if (role == EffectiveWorkspaceRole.Developer)
+                                {
+                                    <div class="ws-nav-label">My Development</div>
+                                    <NavLink href="@($"/projects/{projectId}/overview")" Match="NavLinkMatch.All" class="ws-nav-link">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Dashboard" Size="Size.Small" />
+                                        <span>Development Overview</span>
+                                    </NavLink>
+                                    <NavLink href="@($"/projects/{projectId}/my-work")" class="ws-nav-link">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Assignment" Size="Size.Small" />
+                                        <span>My Assigned Work</span>
+                                    </NavLink>
+                                    <NavLink href="@($"/projects/{projectId}/my-bugs")" class="ws-nav-link">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Flag" Size="Size.Small" />
+                                        <span>Bugs to Fix</span>
+                                    </NavLink>
+
+                                    <div class="ws-nav-label">Project Work</div>
+                                    <NavLink href="@($"/projects/{projectId}/planning")" class="ws-nav-link">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Layers" Size="Size.Small" />
+                                        <span>Project Backlog</span>
+                                    </NavLink>
+                                }
+                                else if (role == EffectiveWorkspaceRole.QaTester)
+                                {
+                                    <div class="ws-nav-label">Quality Assurance</div>
+                                    <NavLink href="@($"/projects/{projectId}/overview")" Match="NavLinkMatch.All" class="ws-nav-link">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Dashboard" Size="Size.Small" />
+                                        <span>Testing Overview</span>
+                                    </NavLink>
+                                    <NavLink href="@($"/projects/{projectId}/verify")" class="ws-nav-link">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Flag" Size="Size.Small" />
+                                        <span>Fixes to Verify</span>
+                                    </NavLink>
+                                    <NavLink href="@($"/projects/{projectId}/reported-bugs")" class="ws-nav-link">
+                                        <MudIcon Icon="@Icons.Material.Outlined.BugReport" Size="Size.Small" />
+                                        <span>Bugs I Reported</span>
+                                    </NavLink>
+
+                                    <div class="ws-nav-label">Project Work</div>
+                                    <NavLink href="@($"/projects/{projectId}/planning")" class="ws-nav-link">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Layers" Size="Size.Small" />
+                                        <span>Testing Backlog</span>
+                                    </NavLink>
+                                }
+                                else if (role == EffectiveWorkspaceRole.Viewer)
+                                {
+                                    <div class="ws-nav-label">Client View</div>
+                                    <NavLink href="@($"/projects/{projectId}/overview")" Match="NavLinkMatch.All" class="ws-nav-link">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Dashboard" Size="Size.Small" />
+                                        <span>Delivery Summary</span>
+                                    </NavLink>
+                                    @if (config?.MilestonesEnabled == true)
+                                    {
+                                        <NavLink href="@($"/projects/{projectId}/deliverables")" class="ws-nav-link">
+                                            <MudIcon Icon="@Icons.Material.Outlined.Assignment" Size="Size.Small" />
+                                            <span>Milestones &amp; Delivery</span>
+                                        </NavLink>
+                                    }
+                                    @if (config?.ReportsEnabled == true)
+                                    {
+                                        <NavLink href="@($"/projects/{projectId}/progress")" class="ws-nav-link">
+                                            <MudIcon Icon="@Icons.Material.Outlined.BarChart" Size="Size.Small" />
+                                            <span>Progress Report</span>
+                                        </NavLink>
+                                    }
+                                }
+
+                                @if (role is EffectiveWorkspaceRole.TechnicalLead or EffectiveWorkspaceRole.Developer or EffectiveWorkspaceRole.QaTester)
+                                {
+                                    @if (hasViews)
+                                    {
+                                        <div class="ws-nav-label">Work Views</div>
+                                        <button type="button" class="ws-nav-link" @onclick="() => _viewsExpanded = !_viewsExpanded">
+                                            <MudIcon Icon="@Icons.Material.Outlined.ViewColumn" Size="Size.Small" />
+                                            <span>Views</span>
+                                            <MudIcon Icon="@(_viewsExpanded ? Icons.Material.Rounded.ExpandMore : Icons.Material.Rounded.ChevronRight)"
+                                                     Size="Size.Small"
+                                                     Class="ws-nav-toggle-chevron" />
+                                        </button>
+                                        @if (_viewsExpanded)
+                                        {
+                                            @if (config!.ListViewEnabled)
+                                            {
+                                                <NavLink href="@($"/projects/{projectId}/list")" class="ws-nav-link ws-nav-child">
+                                                    <span>List view</span>
+                                                </NavLink>
+                                            }
+                                            @if (config.BoardViewEnabled)
+                                            {
+                                                <NavLink href="@($"/projects/{projectId}/board")" class="ws-nav-link ws-nav-child">
+                                                    <span>Board view</span>
+                                                </NavLink>
+                                            }
+                                        }
+                                    }
+
+                                    <div class="ws-nav-label">My Display</div>
+                                    <NavLink href="@($"/projects/{projectId}/preferences")" class="ws-nav-link">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Tune" Size="Size.Small" />
+                                        <span>My Preferences</span>
+                                    </NavLink>
+                                }
+                            }                            
+                    
                         }
                     </div>
-                    <div class="ws-side-bottom">                   
 
-                        <NavLink href="/profile" Match="NavLinkMatch.All" class="ws-nav-link">
-                            <MudIcon Icon="@Icons.Material.Outlined.PersonOutline" Size="Size.Small" />
+                    <div class="ws-side-bottom">
+
+                        @if (Auth.IsActiveUser)
+                        {
+                            <NavLink href="/pending-approval"
+                                    Match="NavLinkMatch.All"
+                                    class="ws-nav-link">
+                                <MudIcon Icon="@Icons.Material.Outlined.HourglassEmpty"
+                                        Size="Size.Small" />
+                                <span>Approval Status</span>
+                            </NavLink>
+                        }
+
+                        <NavLink href="/profile"
+                                Match="NavLinkMatch.All"
+                                class="ws-nav-link">
+                            <MudIcon Icon="@Icons.Material.Outlined.PersonOutline"
+                                    Size="Size.Small" />
                             <span>My Profile</span>
                         </NavLink>
 
-                        <button type="button" class="ws-nav-link ws-logout" @onclick="OpenLogoutDialogAsync">
-                            <MudIcon Icon="@Icons.Material.Outlined.Logout" Size="Size.Small" />
+                        <button type="button"
+                                class="ws-nav-link ws-logout"
+                                @onclick="OpenLogoutDialogAsync">
+                            <MudIcon Icon="@Icons.Material.Outlined.Logout"
+                                    Size="Size.Small" />
                             <span>Log Out</span>
                         </button>
-                    </div>
-                </div>
-            </MudDrawer>
-        </Authorized>
-    </AuthorizeView>
-<MudAppBar Elevation="0"
-           Class="ws-topbar"
-           Style="height: 72px; justify-content: flex-start;">
 
-    <AuthorizeView>
-        <Authorized>
-            <div class="d-flex align-center w-100 px-2">
+                    </div>
+                                    </div>
+                                </MudDrawer>
+                            </Authorized>
+                        </AuthorizeView>
+                    <MudAppBar Elevation="0"
+                            Class="ws-topbar"
+                            Style="height: 72px; justify-content: flex-start;">
+
+                        <AuthorizeView>
+                            <Authorized>
+                                <div class="d-flex align-center w-100 px-2">
 
                 <MudIconButton Icon="@Icons.Material.Filled.Menu"
                                Color="Color.Inherit"
@@ -94,62 +382,11 @@
 
 </MudAppBar>
 
-    <MudMainContent Style="background-color: #F6F8FC; min-height: 100vh;padding-top: 72px; min-height: 100vh;">">
+    <MudMainContent Style="background-color: #F6F8FC; min-height: 100vh;padding-top: 72px; min-height: 100vh;">
         
         <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-7 px-4 px-sm-8">
             @Body
         </MudContainer>
     </MudMainContent>
 </MudLayout>
-
-@code {
-    private bool _drawerOpen = true;
-
-    private string GreetingName
-{
-    get
-    {
-        var firstName = Auth.User?.FirstName?.Trim();
-
-        return string.IsNullOrWhiteSpace(firstName)
-            ? "there"
-            : firstName;
-    }
-}
-
-
-    protected override async Task OnInitializedAsync()
-    {
-        Auth.OnChange += HandleStateChanged;
-        Navigation.LocationChanged += HandleLocationChanged;
-        await Auth.InitializeAsync();
-    }
-
-    private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
-
-    private void HandleStateChanged() => _ = InvokeAsync(StateHasChanged);
-
-    private void HandleLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
-        => _ = InvokeAsync(StateHasChanged);
-
-    private async Task OpenLogoutDialogAsync()
-    {
-        var options = new DialogOptions
-        {
-            NoHeader = true,
-            MaxWidth = MaxWidth.ExtraSmall,
-            FullWidth = true,
-            CloseOnEscapeKey = true,
-            BackdropClick = true,
-            BackgroundClass = "logout-dialog-backdrop"
-        };
-
-        await DialogService.ShowAsync<LogoutConfirmDialog>(string.Empty, options);
-    }
-
-    public void Dispose()
-    {
-        Auth.OnChange -= HandleStateChanged;
-        Navigation.LocationChanged -= HandleLocationChanged;
-    }
 }

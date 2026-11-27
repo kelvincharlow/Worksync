@@ -1,0 +1,410 @@
+
+/* =========================================
+   WORKSYNC DESIGN TOKENS
+   ========================================= */
+
+.wizard-page {
+    --accent: #3F51B5;
+    --accent-hover: #303F9F;
+    --accent-pale: #E8EAF6;
+
+    --navy: #1B2A4A;
+    --bg: #F4F5F7;
+    --card-bg: #FFFFFF;
+
+    --text-dark: #1A1A1A;
+    --text-muted: #6B7280;
+    --text-placeholder: #9CA3AF;
+
+    --border: #E0E2E7;
+
+    --radius: 8px;
+    --radius-sm: 6px;
+
+    font-family: -apple-system, 'Inter', 'Segoe UI',
+        Helvetica, Arial, sans-serif;
+
+    background: var(--bg);
+    padding: 32px;
+    color: var(--text-dark);
+}
+
+.wizard-page * {
+    box-sizing: border-box;
+}
+
+/* =========================================
+   HEADER
+   ========================================= */
+
+.wizard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 24px;
+    gap: 20px;
+}
+
+.eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+    margin: 0 0 6px;
+}
+
+.wizard-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--navy);
+    margin: 0 0 6px;
+}
+
+.wizard-subtitle {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin: 0;
+}
+
+/* =========================================
+   STEPPER
+   ========================================= */
+
+.stepper-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px 32px;
+    margin-bottom: 16px;
+}
+
+.stepper {
+    display: flex;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+}
+
+.stepper-item {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+    font-size: 14px;
+    color: var(--text-muted);
+}
+
+.stepper-item:last-child {
+    flex: 0 0 auto;
+}
+
+.stepper-circle {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 13px;
+    border: 2px solid var(--border);
+    color: var(--text-muted);
+    background: var(--card-bg);
+    flex-shrink: 0;
+    margin-right: 8px;
+}
+
+.stepper-item.active .stepper-circle {
+    background: var(--navy);
+    border-color: var(--navy);
+    color: #FFFFFF;
+}
+
+.stepper-item.active .stepper-label {
+    color: var(--navy);
+    font-weight: 700;
+}
+
+.stepper-item.done .stepper-circle {
+    background: var(--accent-pale);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.stepper-item.done .stepper-label {
+    color: var(--text-dark);
+}
+
+.stepper-circle .check {
+    font-size: 14px;
+}
+
+.stepper-line {
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+    margin: 0 12px;
+    min-width: 8px;
+}
+
+/* =========================================
+   FORM CARD
+   ========================================= */
+
+.form-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px;
+}
+
+.form-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--navy);
+    margin: 0 0 6px;
+}
+
+.form-subtitle {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin: 0 0 28px;
+}
+
+/* =========================================
+   APPROACH CARDS
+   ========================================= */
+
+.approach-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 28px;
+}
+
+.approach-card {
+    position: relative;
+    display: block;
+    width: 100%;
+    text-align: left;
+    font-family: inherit;
+    color: var(--text-dark);
+    background: var(--card-bg);
+
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+
+    cursor: pointer;
+
+    transition:
+        border-color 0.15s ease,
+        background-color 0.15s ease;
+}
+
+.approach-card:hover:not(:disabled) {
+    border-color: var(--accent);
+}
+
+.approach-card:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+}
+
+.approach-card.selected {
+    border: 2px solid var(--accent);
+    background: var(--accent-pale);
+    padding: 19px;
+}
+
+.approach-card.disabled,
+.approach-card:disabled {
+    cursor: not-allowed;
+    color: var(--text-placeholder);
+    background: #FAFAFA;
+}
+
+.approach-card.disabled .approach-title,
+.approach-card.disabled .approach-description {
+    color: var(--text-placeholder);
+}
+
+.approach-icon {
+    color: var(--navy);
+    margin-bottom: 12px;
+}
+
+.approach-card.disabled .approach-icon {
+    color: var(--text-placeholder);
+}
+
+.approach-check {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 14px;
+}
+
+.approach-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--navy);
+    margin: 0 0 6px;
+}
+
+.approach-description {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin: 0;
+    line-height: 1.4;
+}
+
+.approach-badge {
+    display: inline-block;
+    margin-top: 12px;
+    background: #ECEEF1;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 4px 10px;
+    border-radius: 999px;
+}
+
+/* =========================================
+   INFORMATION BANNER
+   ========================================= */
+
+.info-banner {
+    background: var(--accent-pale);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: var(--text-dark);
+    margin-bottom: 28px;
+    line-height: 1.5;
+}
+
+/* =========================================
+   FOOTER
+   ========================================= */
+
+.form-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    gap: 12px;
+}
+
+.step-counter {
+    font-size: 13px;
+    color: var(--text-placeholder);
+}
+
+/* =========================================
+   BUTTONS
+   ========================================= */
+
+.btn {
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    border-radius: var(--radius-sm);
+    padding: 10px 20px;
+    cursor: pointer;
+    border: none;
+
+    transition:
+        background-color 0.15s ease,
+        opacity 0.15s ease;
+}
+
+.btn-primary {
+    background: var(--accent);
+    color: #FFFFFF;
+
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: var(--accent-hover);
+}
+
+.btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-secondary {
+    background: var(--card-bg);
+    color: var(--navy);
+    border: 1px solid var(--border);
+}
+
+.btn-secondary:hover {
+    background: var(--bg);
+}
+
+.btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+}
+
+.arrow {
+    font-weight: 400;
+}
+
+/* =========================================
+   RESPONSIVE LAYOUT
+   ========================================= */
+
+@media (max-width: 768px) {
+    .wizard-page {
+        padding: 20px;
+    }
+
+    .stepper-card {
+        padding: 20px 16px;
+        overflow-x: auto;
+    }
+
+    .stepper {
+        min-width: 650px;
+    }
+
+    .form-card {
+        padding: 24px 20px;
+    }
+
+    .approach-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .wizard-page {
+        padding: 14px;
+    }
+
+    .wizard-header {
+        flex-direction: column;
+    }
+
+    .wizard-title {
+        font-size: 24px;
+    }
+
+    .form-card {
+        padding: 20px 16px;
+    }
+}

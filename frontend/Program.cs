@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using MudBlazor;
 using MudBlazor.Services;
 using Worksync.Frontend;
+using Worksync.Frontend.Services.Projects;
 
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
@@ -44,9 +45,28 @@ builder.Services.AddAuthorizationCore(options =>
         policy.RequireAuthenticatedUser()
               .RequireClaim("status", "ACTIVE")
               .RequireRole("ADMIN"));
-});
+
+    // Only active users with explicit project creation permission.
+    // Being an administrator does not automatically grant access.
+    options.AddPolicy("CanCreateProject", policy =>
+    policy.RequireAuthenticatedUser()
+          .RequireClaim("status", "ACTIVE")
+          .RequireClaim("permission", "PROJECT_CREATE")
+          .RequireAssertion(context =>
+              !context.User.IsInRole("ADMIN")));
+              });
 
 builder.Services.AddScoped<AuthState>();
+// Project management services
+builder.Services.AddScoped<ProjectContextState>();
+
+builder.Services.AddScoped<InMemoryProjectWorkspaceService>();
+
+builder.Services.AddScoped<IProjectService>(sp =>
+    sp.GetRequiredService<InMemoryProjectWorkspaceService>());
+
+builder.Services.AddScoped<IWorkItemService>(sp =>
+    sp.GetRequiredService<InMemoryProjectWorkspaceService>());
 builder.Services.AddScoped<AuthenticationStateProvider, WorksyncAuthenticationStateProvider>();
 builder.Services.AddScoped<AuthSessionService>();
 builder.Services.AddTransient<AuthMessageHandler>();

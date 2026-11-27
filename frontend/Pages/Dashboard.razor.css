@@ -1,0 +1,104 @@
+
+/* =========================================
+   DASHBOARD STATISTIC CARDS
+   ========================================= */
+
+.ws-stat-card {
+    height: 100%;
+    min-height: 115px;
+    padding: 20px;
+    background-color: #FFFFFF;
+    border: 1px solid #E0E2E7;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(27, 42, 74, 0.04);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    box-sizing: border-box;
+}
+
+.ws-stat-card:hover {
+    box-shadow: 0 5px 16px rgba(27, 42, 74, 0.08);
+    transform: translateY(-2px);
+}
+
+/* Card heading */
+
+.ws-stat-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    color: #64748B;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+/* Statistic number */
+
+.ws-stat-value {
+    margin-top: 16px;
+    color: #1B2A4A;
+    font-size: 1.8rem;
+    font-weight: 700;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Statistic icon container */
+
+.ws-stat-icon {
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9px;
+    flex-shrink: 0;
+}
+
+/* Status colours */
+
+.ws-stat-icon.amber {
+    background-color: #FFF7E6;
+    color: #F9A825;
+}
+
+.ws-stat-icon.green {
+    background-color: #E8F5E9;
+    color: #2E7D32;
+}
+
+.ws-stat-icon.red {
+    background-color: #FDECEC;
+    color: #C62828;
+}
+
+.ws-stat-icon.indigo {
+    background-color: #EEF2FF;
+    color: #3F51B5;
+}
+
+/* =========================================
+   RESPONSIVE DASHBOARD
+   ========================================= */
+
+@media (max-width: 599px) {
+
+    .ws-stat-card {
+        min-height: 105px;
+        padding: 14px;
+    }
+
+    .ws-stat-head {
+        font-size: 0.78rem;
+    }
+
+    .ws-stat-value {
+        font-size: 1.5rem;
+        margin-top: 12px;
+    }
+
+    .ws-stat-icon {
+        width: 32px;
+        height: 32px;
+    }
+}

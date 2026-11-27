@@ -1257,3 +1257,82 @@ h1:focus,
 .logout-button:hover {
     background-color: #5A3B58;
 }
+/* Project switcher & nested sidebar navigation */
+.ws-create-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    height: 40px;
+    margin: 8px 0 4px;
+    border: none;
+    border-radius: 9px;
+    background: #6366F1;
+    color: #FFFFFF;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-decoration: none !important;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.ws-create-btn:hover {
+    background: #4F46E5;
+    color: #FFFFFF;
+}
+
+.ws-project-box {
+    margin: 12px 0 6px;
+    padding: 12px;
+    border-radius: 11px;
+    background: #22345B;
+    border: 1px solid #354C7C;
+}
+
+.ws-project-box-label {
+    display: block;
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #94A3B8;
+    margin-bottom: 6px;
+}
+
+.ws-project-select {
+    width: 100%;
+    background: #1B2A4A;
+    color: #FFFFFF;
+    border: 1px solid #41588A;
+    border-radius: 7px;
+    padding: 7px 9px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    outline: none;
+    cursor: pointer;
+}
+
+.ws-project-select option {
+    background: #FFFFFF;
+    color: #0F172A;
+}
+
+.ws-project-role-note {
+    display: block;
+    margin-top: 6px;
+    font-size: 0.7rem;
+    color: #A5B4FC;
+}
+
+.ws-nav-child {
+    padding-left: 38px !important;
+    height: 36px !important;
+    font-size: 0.82rem !important;
+    color: #B8C7DB !important;
+}
+
+.ws-nav-toggle-chevron {
+    margin-left: auto;
+    opacity: 0.75;
+}

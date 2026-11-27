@@ -1,0 +1,90 @@
+@page "/home"
+@attribute [Authorize(Policy = "CanCreateProject")]
+
+<PageTitle>Home · Worksync</PageTitle>
+
+<div class="ws-home">
+
+    @* Page header *@
+    <header class="ws-home-header">
+
+        <div class="ws-home-heading">
+            <div class="ws-home-eyebrow">
+                PERSONAL WORKSPACE
+            </div>
+
+            <h1>Home</h1>
+
+            <p>Your work, projects and decisions in one place.</p>
+        </div>
+
+        <a class="ws-home-primary-button" href="/projects/new">
+            <span class="ws-button-plus">+</span>
+            New project
+        </a>
+
+    </header>
+
+
+    @* Unfinished project setup banner *@
+    <div class="ws-draft-banner">
+
+        <div class="ws-draft-message">
+            <strong>Unfinished project setup</strong>
+            <span class="ws-draft-separator">·</span>
+            <span>Untitled project</span>
+            <span class="ws-draft-separator">·</span>
+            <span>Step 1 of 6</span>
+        </div>
+
+        <a class="ws-draft-button" href="/projects/new">
+            Resume setup
+        </a>
+
+    </div>
+
+
+    @* Welcome card *@
+    <section class="ws-welcome-card">
+
+        <div class="ws-welcome-decoration"></div>
+
+        <div class="ws-welcome-content">
+
+            <div class="ws-welcome-icon">
+                <MudIcon Icon="@Icons.Material.Outlined.FolderOpen"
+                         Size="Size.Large" />
+            </div>
+
+            <div class="ws-get-started">
+                GET STARTED
+            </div>
+
+            <h2>Your workspace starts here</h2>
+
+            <p class="ws-welcome-description">
+                Create your first project with a guided setup.
+                You can enable epics, stories and milestones when
+                they are useful, not as a requirement.
+            </p>
+
+            <div class="ws-welcome-actions">
+
+                <a class="ws-home-primary-button"
+                   href="/projects/new">
+                    <span class="ws-button-plus">+</span>
+                    Create your first project
+                </a>
+
+                <a class="ws-home-secondary-button"
+                   href="/projects/sample">
+                    Explore sample workspace
+                </a>
+
+            </div>
+
+        </div>
+
+    </section>
+
+</div>

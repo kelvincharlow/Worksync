@@ -1,0 +1,340 @@
+
+/* ===== Design tokens ===== */
+
+.wizard-page {
+    --accent: #3F51B5;
+    --accent-hover: #1B2A4A;
+    --accent-pale: #EEF0FA;
+
+    --bg: #F4F5F7;
+    --card-bg: #FFFFFF;
+
+    --text-dark: #1A1A1A;
+    --text-muted: #6B7280;
+    --text-placeholder: #9CA3AF;
+
+    --border: #E0E2E7;
+    --border-focus: #3F51B5;
+
+    --error: #C62828;
+
+    --radius: 8px;
+    --radius-sm: 6px;
+
+    font-family: -apple-system, 'Inter', 'Segoe UI',
+                 Helvetica, Arial, sans-serif;
+
+    background: var(--bg);
+    padding: 32px;
+    color: var(--text-dark);
+    min-height: 100vh;
+    box-sizing: border-box;
+}
+
+/* ===== Header ===== */
+
+.wizard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 24px;
+}
+
+.eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+    margin: 0 0 6px;
+}
+
+.wizard-title {
+    font-size: 28px;
+    font-weight: 700;
+    margin: 0 0 6px;
+    color: var(--text-dark);
+}
+
+.wizard-subtitle {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin: 0;
+}
+
+/* ===== Stepper ===== */
+
+.stepper-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px 32px;
+    margin-bottom: 16px;
+}
+
+.stepper {
+    display: flex;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.stepper-item {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+    font-size: 14px;
+    color: var(--text-muted);
+}
+
+.stepper-item:last-child {
+    flex: 0 0 auto;
+}
+
+.stepper-circle {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 13px;
+    border: 2px solid var(--border);
+    color: var(--text-muted);
+    background: var(--card-bg);
+    flex-shrink: 0;
+    margin-right: 8px;
+}
+
+.stepper-item.active .stepper-circle {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #FFFFFF;
+}
+
+.stepper-item.active .stepper-label {
+    color: var(--text-dark);
+    font-weight: 700;
+}
+
+.stepper-item.done .stepper-circle {
+    background: var(--accent-pale);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.stepper-line {
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+    margin: 0 12px;
+}
+
+/* ===== Form card ===== */
+
+.form-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px;
+}
+
+.form-title {
+    font-size: 22px;
+    font-weight: 700;
+    margin: 0 0 6px;
+    color: var(--text-dark);
+}
+
+.form-subtitle {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin: 0 0 28px;
+}
+
+/* ===== Fields ===== */
+
+.field {
+    margin-bottom: 24px;
+}
+
+.field-row {
+    display: flex;
+    gap: 24px;
+}
+
+.field-row .field {
+    flex: 1;
+    min-width: 0;
+}
+
+.wizard-page label {
+    display: block;
+    font-weight: 700;
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+.required {
+    color: var(--error);
+}
+
+.input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-family: inherit;
+    color: var(--text-dark);
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    transition: border-color 0.15s ease;
+}
+
+.input::placeholder {
+    color: var(--text-placeholder);
+}
+
+.input:focus {
+    outline: none;
+    border-color: var(--border-focus);
+    box-shadow: 0 0 0 3px var(--accent-pale);
+}
+
+.input.invalid {
+    border-color: var(--error);
+}
+
+textarea.input {
+    resize: vertical;
+    min-height: 90px;
+}
+
+.field-error {
+    display: block;
+    color: var(--error);
+    font-size: 12px;
+    margin-top: 6px;
+}
+
+/* ===== Info banner ===== */
+
+.info-banner {
+    background: var(--accent-pale);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: var(--text-dark);
+    margin-bottom: 28px;
+}
+
+/* ===== Footer ===== */
+
+.form-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+}
+
+.step-counter {
+    font-size: 13px;
+    color: var(--text-placeholder);
+}
+
+/* ===== Buttons ===== */
+
+.btn {
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    border-radius: var(--radius-sm);
+    padding: 10px 20px;
+    cursor: pointer;
+    border: none;
+    transition: background-color 0.15s ease,
+                opacity 0.15s ease;
+}
+
+.btn-primary {
+    background: var(--accent);
+    color: #FFFFFF;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-primary:hover {
+    background: var(--accent-hover);
+}
+
+.btn-link {
+    background: transparent;
+    color: var(--text-dark);
+    padding: 10px 8px;
+}
+
+.btn-link:hover {
+    text-decoration: underline;
+}
+
+.btn-secondary {
+    background: var(--card-bg);
+    color: var(--text-dark);
+    border: 1px solid var(--border);
+}
+
+.btn-secondary:hover {
+    background: var(--bg);
+}
+
+.arrow {
+    font-weight: 400;
+}
+
+/* ===== Responsive layout ===== */
+
+@media (max-width: 768px) {
+
+    .wizard-page {
+        padding: 20px 16px;
+    }
+
+    .wizard-header {
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    .stepper-card {
+        padding: 20px 12px;
+    }
+
+    .stepper-item {
+        flex-direction: column;
+        gap: 6px;
+        font-size: 11px;
+        text-align: center;
+    }
+
+    .stepper-circle {
+        margin-right: 0;
+    }
+
+    .stepper-line {
+        display: none;
+    }
+
+    .form-card {
+        padding: 24px 20px;
+    }
+
+    .field-row {
+        flex-direction: column;
+        gap: 0;
+    }
+}

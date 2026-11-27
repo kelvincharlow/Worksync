@@ -1,0 +1,343 @@
+/* =========================================
+   HOME PAGE
+   ========================================= */
+
+.ws-home {
+    width: 100%;
+    min-height: 100%;
+    box-sizing: border-box;
+    padding: 32px;
+    background-color: #F4F5F7;
+    color: #1A1A1A;
+}
+
+
+/* =========================================
+   PAGE HEADER
+   ========================================= */
+
+.ws-home-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 24px;
+    margin-bottom: 26px;
+}
+
+.ws-home-heading {
+    display: flex;
+    flex-direction: column;
+}
+
+.ws-home-eyebrow {
+    color: #3F51B5;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 1.2px;
+    line-height: 1.4;
+    margin-bottom: 12px;
+}
+
+.ws-home-heading h1 {
+    color: #1B2A4A;
+    font-size: 28px;
+    font-weight: 750;
+    line-height: 1.2;
+    margin: 0 0 8px 0;
+}
+
+.ws-home-heading p {
+    color: #68758A;
+    font-size: 13px;
+    line-height: 1.6;
+    margin: 0;
+}
+
+
+/* =========================================
+   PRIMARY BUTTON
+   ========================================= */
+
+.ws-home-primary-button {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    min-height: 37px;
+    padding: 0 17px;
+    border: 1px solid #3F51B5;
+    border-radius: 8px;
+    background-color: #3F51B5;
+    color: #FFFFFF;
+    font-size: 12px;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.2s ease,
+                border-color 0.2s ease;
+}
+
+.ws-home-primary-button:hover {
+    background-color: #1B2A4A;
+    border-color: #1B2A4A;
+    color: #FFFFFF;
+    text-decoration: none;
+}
+
+.ws-button-plus {
+    font-size: 20px;
+    font-weight: 400;
+    line-height: 1;
+}
+
+
+/* =========================================
+   UNFINISHED PROJECT BANNER
+   ========================================= */
+
+.ws-draft-banner {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    min-height: 59px;
+    box-sizing: border-box;
+    padding: 12px 17px;
+    margin-bottom: 18px;
+    border-left: 3px solid #3F51B5;
+    background-color: #F0F1F8;
+}
+
+.ws-draft-message {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 5px;
+    color: #1B2A4A;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.ws-draft-message strong {
+    font-weight: 750;
+}
+
+.ws-draft-separator {
+    color: #929AAA;
+    margin: 0 1px;
+}
+
+.ws-draft-button {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 32px;
+    padding: 0 12px;
+    border: 1px solid #C8CEE5;
+    border-radius: 7px;
+    background-color: #F4F5F7;
+    color: #3F51B5;
+    font-size: 11px;
+    font-weight: 750;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background-color 0.2s ease;
+}
+
+.ws-draft-button:hover {
+    background-color: #E0E2E7;
+    color: #1B2A4A;
+    text-decoration: none;
+}
+
+
+/* =========================================
+   WELCOME CARD
+   ========================================= */
+
+.ws-welcome-card {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    min-height: 402px;
+    box-sizing: border-box;
+    padding: 60px 24px 30px;
+    overflow: hidden;
+    border: 1px solid #E0E2E7;
+    border-radius: 11px;
+    background-color: #FFFFFF;
+}
+
+
+/* Decorative circle in the top-right corner */
+
+.ws-welcome-decoration {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 150px;
+    height: 150px;
+    border-radius: 0 0 0 100%;
+    background-color: #F0F1F8;
+    pointer-events: none;
+}
+
+
+/* =========================================
+   WELCOME CONTENT
+   ========================================= */
+
+.ws-welcome-content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 570px;
+    text-align: center;
+}
+
+
+/* Folder icon background */
+
+.ws-welcome-icon {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 92px;
+    height: 92px;
+    margin-bottom: 18px;
+    border-radius: 25px;
+    background-color: #E8EAF6;
+    color: #3F51B5;
+}
+
+.ws-welcome-icon .mud-icon-root {
+    font-size: 43px;
+}
+
+
+/* GET STARTED label */
+
+.ws-get-started {
+    margin-bottom: 26px;
+    color: #3F51B5;
+    font-size: 10px;
+    font-weight: 850;
+    letter-spacing: 1.4px;
+}
+
+
+/* Welcome heading */
+
+.ws-welcome-content h2 {
+    margin: 0 0 15px 0;
+    color: #1B2A4A;
+    font-size: 24px;
+    font-weight: 750;
+    line-height: 1.3;
+}
+
+
+/* Welcome description */
+
+.ws-welcome-description {
+    max-width: 470px;
+    margin: 0 0 17px 0;
+    color: #68758A;
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.7;
+}
+
+
+/* =========================================
+   WELCOME ACTION BUTTONS
+   ========================================= */
+
+.ws-welcome-actions {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 9px;
+}
+
+.ws-home-secondary-button {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 37px;
+    padding: 0 15px;
+    border: 1px solid #C8CEE5;
+    border-radius: 8px;
+    background-color: #FFFFFF;
+    color: #1B2A4A;
+    font-size: 12px;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background-color 0.2s ease,
+                border-color 0.2s ease;
+}
+
+.ws-home-secondary-button:hover {
+    background-color: #F4F5F7;
+    border-color: #3F51B5;
+    color: #1B2A4A;
+    text-decoration: none;
+}
+
+
+/* =========================================
+   RESPONSIVE LAYOUT
+   ========================================= */
+
+@media (max-width: 600px) {
+
+    .ws-home {
+        padding: 20px 15px;
+    }
+
+    .ws-home-header {
+        flex-direction: column;
+        gap: 18px;
+    }
+
+    .ws-draft-banner {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .ws-welcome-card {
+        min-height: 390px;
+        padding: 45px 18px 30px;
+    }
+
+    .ws-welcome-decoration {
+        width: 100px;
+        height: 100px;
+    }
+
+    .ws-welcome-content h2 {
+        font-size: 21px;
+    }
+
+    .ws-welcome-description {
+        font-size: 12px;
+    }
+
+    .ws-welcome-actions {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .ws-welcome-actions a {
+        width: 100%;
+        box-sizing: border-box;
+    }
+}

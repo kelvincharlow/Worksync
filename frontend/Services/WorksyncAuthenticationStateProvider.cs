@@ -3,7 +3,8 @@ using Microsoft.AspNetCore.Components.Authorization;
 
 namespace Worksync.Frontend.Services;
 
-public class WorksyncAuthenticationStateProvider : AuthenticationStateProvider, IDisposable
+public class WorksyncAuthenticationStateProvider
+    : AuthenticationStateProvider, IDisposable
 {
     private static readonly AuthenticationState Anonymous =
         new(new ClaimsPrincipal(new ClaimsIdentity()));
@@ -16,7 +17,8 @@ public class WorksyncAuthenticationStateProvider : AuthenticationStateProvider, 
         _authState.OnChange += HandleAuthStateChanged;
     }
 
-    public override async Task<AuthenticationState> GetAuthenticationStateAsync()
+    public override async Task<AuthenticationState>
+        GetAuthenticationStateAsync()
     {
         await _authState.InitializeAsync();
 
@@ -31,19 +33,38 @@ public class WorksyncAuthenticationStateProvider : AuthenticationStateProvider, 
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, user.Id),
-            new(ClaimTypes.Name, string.IsNullOrWhiteSpace(fullName) ? user.Email : fullName),
+            new(
+                ClaimTypes.Name,
+                string.IsNullOrWhiteSpace(fullName)
+                    ? user.Email
+                    : fullName),
             new(ClaimTypes.Email, user.Email),
             new(ClaimTypes.Role, user.Role),
             new("status", user.Status)
         };
 
-        var identity = new ClaimsIdentity(claims, authenticationType: "WorksyncJwt");
-        return new AuthenticationState(new ClaimsPrincipal(identity));
+        // Include explicitly assigned permissions.
+        foreach (var permission in user.Permissions)
+        {
+            if (!string.IsNullOrWhiteSpace(permission))
+            {
+                claims.Add(
+                    new Claim("permission", permission.Trim()));
+            }
+        }
+
+        var identity = new ClaimsIdentity(
+            claims,
+            authenticationType: "WorksyncJwt");
+
+        return new AuthenticationState(
+            new ClaimsPrincipal(identity));
     }
 
     private void HandleAuthStateChanged()
     {
-        NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
+        NotifyAuthenticationStateChanged(
+            GetAuthenticationStateAsync());
     }
 
     public void Dispose()
